@@ -1,0 +1,51 @@
+/* GLOBAL BACKGROUND */
+body {
+    background-color: #27313f;
+}
+
+/* HERO SECTION */
+.hero {
+    background-image: url('https://images.unsplash.com/photo-1560185893-a55f6b3e4fdb');
+    background-size: cover;
+    background-position: center;
+    padding: 120px 20px;
+    border-radius: 10px;
+}
+
+/* SEARCH BAR */
+.search-box input {
+    border-radius: 50px !important;
+    padding: 15px;
+    font-size: 18px;
+    border: 1px solid #e3e3e3;
+}
+
+.search-btn {
+    border-radius: 50px !important;
+    background-color: #1e88e5;
+    color: rgb(134, 75, 75);
+    padding: 12px 25px;
+    font-size: 18px;
+}
+
+/* HOW IT WORKS CARDS */
+.card {
+    background-color: rgb(147, 113, 113);
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.card h3 {
+    margin-top: 10px;
+    font-size: 18px;
+}
+
+/* FOOTER */
+.footer {
+    text-align: center;
+    color: #888;
+    margin-top: 40px;
+    font-size: 14px;
+}
