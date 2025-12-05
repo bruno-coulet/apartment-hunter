@@ -4,8 +4,7 @@ body {
 }
 
 /* HERO SECTION */
-.hero {
-    background-image: url('https://images.unsplash.com/photo-1560185893-a55f6b3e4fdb');
+.hero { 
     background-size: cover;
     background-position: center;
     padding: 120px 20px;
