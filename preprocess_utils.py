@@ -71,7 +71,7 @@ def is_boolean_like(series: pd.Series) -> bool:
 
     return False
 
-def split_columns(
+def split_by_dtype(
     df: pd.DataFrame,
     convert_bool: bool = True,
     bool_dtype: str = 'UInt8'
@@ -118,11 +118,25 @@ def split_columns(
 
 # ======= utilisation =============
 
-# from preprocess_utils import split_columns
+# from preprocess_utils import split_by_dtype
 
-# df_bool, df_num, df_quali, bool_cols, num_col, quali_cols = split_columns(df, convert_bool=True, bool_dtype='UInt8')
+# df_bool, df_num, df_quali, bool_cols, num_col, quali_cols = split_by_dtype(df, convert_bool=True, bool_dtype='UInt8')
 
 # print("bool:", bool_cols)
 # print("numeric:", num_col)
 # print("qualitative:", quali_cols)
 # print(df_bool.shape, df_num.shape, df_quali.shape)
+
+
+def detect_outliers_iqr(data, factor=1.5):
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    return (data < lower_bound) | (data > upper_bound)
+
+
+def detect_outliers_z_score(data, threshold=3):
+    z_scores = (data - data.mean()) / data.std()
+    return np.abs(z_scores) > threshold
