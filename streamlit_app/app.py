@@ -26,29 +26,30 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# SEARCH BAR
+# SEARCH BAR (cosmétique)
 st.markdown("<br>", unsafe_allow_html=True)
-
-col1, col2 = st.columns([4,1])
+col1, col2 = st.columns([4, 1])
 
 with col1:
-    adresse = st.text_input("Adresse", placeholder="Ex : 10 rue de Marseille, 13001", key="search", label_visibility="collapsed")
+    adresse = st.text_input(
+        "Adresse",
+        placeholder="Ex : Calle de Alcalá, Madrid",
+        key="search",
+        label_visibility="collapsed"
+    )
 
 with col2:
-    if st.button("Rechercher"):
-        st.session_state.estimate_click = True
-
+    st.button("Rechercher")
 
 # ---------- HOW IT WORKS ----------
 st.markdown("<br><h2>Comment ça marche ?</h2>", unsafe_allow_html=True)
-
 c1, c2, c3 = st.columns(3)
 
 with c1:
     st.markdown("""
         <div class='card'>
             <h3>1. Renseignez votre bien</h3>
-            <p>Surface, chambres, étage…</p>
+            <p>Surface, chambres, quartier, équipements…</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -64,61 +65,92 @@ with c3:
     st.markdown("""
         <div class='card'>
             <h3>3. Obtenez votre estimation</h3>
-            <p>Un prix fiable, instantanément.</p>
+            <p>Un prix instantané basé sur votre modèle.</p>
         </div>
     """, unsafe_allow_html=True)
-
 
 # ---------- PROPERTY INPUTS ----------
 st.markdown("<br><h2>Caractéristiques du bien</h2>", unsafe_allow_html=True)
 
+# (A) Variables structurelles
 colA, colB, colC = st.columns(3)
-
 with colA:
-    surface = st.number_input("Surface (m²)", 10, 500)
-
+    sq_mt_built = st.number_input("Surface construite (m²)", min_value=10, max_value=1000, value=80, step=1)
 with colB:
-    rooms = st.number_input("Nombre de pièces", 1, 20)
-
+    n_rooms = st.number_input("Nombre de chambres", min_value=0, max_value=24, value=3, step=1)
 with colC:
-    bathrooms = st.number_input("Salles de bain", 1, 10)
+    n_bathrooms = st.number_input("Salles de bain", min_value=1, max_value=16, value=2, step=1)
 
+# (B) Quartier
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Mets ici les valeurs possibles de neighborhood.
+# Si tu ne connais pas la liste exacte, tu peux laisser un champ numérique.
+NEIGHBORHOOD_VALUES = list(range(1, 136))  # 1..135 d'après ton dataset
+
+neighborhood = st.selectbox("Quartier (neighborhood)", options=NEIGHBORHOOD_VALUES, index=58)  # 59 par défaut approx
+
+# (C) Equipements (binaires)
+st.markdown("<br><h3>Équipements</h3>", unsafe_allow_html=True)
+
+e1, e2, e3 = st.columns(3)
+with e1:
+    has_lift = st.checkbox("Ascenseur (has_lift)", value=True)
+    has_parking = st.checkbox("Parking (has_parking)", value=False)
+with e2:
+    has_pool = st.checkbox("Piscine (has_pool)", value=False)
+    has_garden = st.checkbox("Jardin (has_garden)", value=False)
+with e3:
+    has_storage_room = st.checkbox("Cave / débarras (has_storage_room)", value=False)
+    is_floor_under = st.checkbox("Sous-sol (is_floor_under)", value=False)
 
 # ---------- CALL API ----------
+st.markdown("<br>", unsafe_allow_html=True)
+
 if st.button("Estimer le bien"):
     payload = {
-        "surface": surface,
-        "rooms": rooms,
-        "bathrooms": bathrooms
+        # noms = ceux de ton df_model
+        "sq_mt_built": float(sq_mt_built),
+        "n_rooms": int(n_rooms),
+        "n_bathrooms": float(n_bathrooms),
+        "neighborhood": int(neighborhood),
+        "has_lift": int(has_lift),
+        "has_parking": int(has_parking),
+        "has_pool": int(has_pool),
+        "has_garden": int(has_garden),
+        "has_storage_room": int(has_storage_room),
+        "is_floor_under": int(is_floor_under),
     }
 
     try:
         response = requests.post("http://localhost:8000/predict", json=payload)
-        
+
         if response.status_code == 200:
             result = response.json()
-            
+
             # Affichage principal du prix
             st.success(f"💰 **Valeur estimée : {result['prediction']:,.0f} €**")
-            
-            # Affichage des détails du preprocessing (collapsible)
+
+            # Détails (si ton API renvoie ces champs)
             with st.expander("🔍 Détails de l'analyse"):
-                st.write("**Pipeline de preprocessing appliqué :**")
-                st.write(f"✅ Preprocessing: {result.get('preprocessing_applied', 'Non')}")
+                st.write("**Payload envoyé au modèle :**")
+                st.json(payload)
+
+                st.write("**Infos API :**")
+                st.write(f"✅ Preprocessing: {result.get('preprocessing_applied', 'N/A')}")
                 st.write(f"📊 Facteur qualité: {result.get('quality_factor', 'N/A')}")
-                
+
                 st.write("**Features utilisées :**")
-                features = result.get('features_used', [])
-                for feature in features:
+                for feature in result.get("features_used", []):
                     st.write(f"• {feature}")
-                
-                # Calcul du ratio surface/pièces pour info
-                surface_per_room = surface / rooms if rooms > 0 else 0
-                st.write(f"📏 Surface par pièce: {surface_per_room:.1f} m²")
-                
+
         else:
             st.error(f"Erreur API: {response.status_code}")
-            
+            try:
+                st.code(response.text)
+            except Exception:
+                pass
+
     except Exception as e:
         st.error(f"Erreur lors de l'appel au modèle: {str(e)}")
 
