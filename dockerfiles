@@ -1,0 +1,8 @@
+#Selection de notre language de base
+FROM python 
+#crée un espace isolé
+WORKDIR  / app
+# installe les dépendances
+RUN pip install -r requirements.txt
+# copie les fichiers de l'application
+COPY . / app

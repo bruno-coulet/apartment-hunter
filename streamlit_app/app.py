@@ -2,8 +2,12 @@ import streamlit as st
 import requests
 
 # Load CSS
-with open("style.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+try:
+    with open("streamlit_app/style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+except FileNotFoundError:
+    # Si le fichier CSS n'est pas trouvé, continuer sans style
+    pass
 
 # ---------- HEADER ----------
 st.markdown("""
@@ -86,9 +90,9 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # Mets ici les valeurs possibles de neighborhood.
 # Si tu ne connais pas la liste exacte, tu peux laisser un champ numérique.
-NEIGHBORHOOD_VALUES = list(range(1, 136))  # 1..135 d'après ton dataset
+NEIGHBORHOOD_VALUES = list(range(1, 136))  # 1 à 135 d'après ton dataset
 
-neighborhood = st.selectbox("Quartier (neighborhood)", options=NEIGHBORHOOD_VALUES, index=58)  # 59 par défaut approx
+neighborhood = st.selectbox("Quartier (neighborhood)", options=NEIGHBORHOOD_VALUES, index=4)  # Quartier 5 par défaut
 
 # (C) Equipements (binaires)
 st.markdown("<br><h3>Équipements</h3>", unsafe_allow_html=True)
@@ -127,32 +131,50 @@ if st.button("Estimer le bien"):
 
         if response.status_code == 200:
             result = response.json()
+            
+            # 🔍 DEBUG : Affichons toute la réponse
+            st.write("**🔍 DEBUG - Réponse complète de l'API :**")
+            st.json(result)
+            
+            # Vérifions si 'prediction' existe
+            if 'prediction' in result:
+                # Affichage principal du prix
+                st.success(f"💰 **Valeur estimée : {result['prediction']:,.0f} €**")
 
-            # Affichage principal du prix
-            st.success(f"💰 **Valeur estimée : {result['prediction']:,.0f} €**")
+                # Détails (si ton API renvoie ces champs)
+                with st.expander("🔍 Détails de l'analyse"):
+                    st.write("**Payload envoyé au modèle :**")
+                    st.json(payload)
 
-            # Détails (si ton API renvoie ces champs)
-            with st.expander("🔍 Détails de l'analyse"):
-                st.write("**Payload envoyé au modèle :**")
-                st.json(payload)
+                    st.write("**Infos API :**")
+                    st.write(f"✅ Preprocessing: {result.get('preprocessing_applied', 'N/A')}")
+                    st.write(f"📊 Modèle utilisé: {result.get('model_used', 'N/A')}")
+                    st.write(f"📈 Performance R²: {result.get('r2_score', 'N/A')}")
 
-                st.write("**Infos API :**")
-                st.write(f"✅ Preprocessing: {result.get('preprocessing_applied', 'N/A')}")
-                st.write(f"📊 Facteur qualité: {result.get('quality_factor', 'N/A')}")
-
-                st.write("**Features utilisées :**")
-                for feature in result.get("features_used", []):
-                    st.write(f"• {feature}")
+                    st.write("**Features count :**")
+                    st.write(f"• Nombre de features: {result.get('features_count', 'N/A')}")
+            else:
+                # Si pas de 'prediction', c'est probablement une erreur
+                st.error("❌ L'API a renvoyé une erreur :")
+                if 'error' in result:
+                    st.code(result['error'])
+                else:
+                    st.write("Réponse inattendue de l'API")
+                    st.json(result)
 
         else:
             st.error(f"Erreur API: {response.status_code}")
+            st.write("**📱 Détails de la réponse :**")
             try:
+                error_json = response.json()
+                st.json(error_json)
+            except:
                 st.code(response.text)
-            except Exception:
-                pass
 
     except Exception as e:
-        st.error(f"Erreur lors de l'appel au modèle: {str(e)}")
+        st.error(f"❌ Erreur lors de l'appel au modèle: {str(e)}")
+        st.write("**🔍 Détails de l'erreur :**")
+        st.code(str(e))
 
 # ---------- FOOTER ----------
 st.markdown("""

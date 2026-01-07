@@ -3,4 +3,10 @@ numpy
 uvicorn
 streamlit
 panda
-pickle
+scikit-learn
+jupyter
+matplotlib
+seaborn
+plotly
+sklearn
+pickle 
