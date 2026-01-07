@@ -2,6 +2,7 @@ raw_data/
 data/
 data_model/
 img/
+models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
