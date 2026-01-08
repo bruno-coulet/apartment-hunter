@@ -1,6 +1,8 @@
 # utils.py
 import pandas as pd
 import numpy as np
+import unicodedata
+import re
 
 # ===============================
 # Fonctions de nettoyage et exploration de données
@@ -139,6 +141,72 @@ def impute_categorical(df: pd.DataFrame, cols: list = None, fill_value: str = 'm
     for col in cols:
         df[col] = df[col].fillna(fill_value)
     return df
+
+# --- Taux de remplissage ---
+def fill_rate(df):
+    return df.count() / len(df) * 100
+
+# --- Suppression de colonnes ---
+dropped_cols = []
+def delete(df: pd.DataFrame, col: str, dropped: list = None) -> pd.DataFrame:
+    """
+    Supprime une colonne d'un DataFrame et l'ajoute à la liste `dropped` si fournie.
+    Attention : la fonction retourne un nouveau DataFrame, il faut le réaffecter.
+    """
+    if dropped is not None:
+        dropped.append(col)
+    return df.drop(columns=[col])
+
+
+
+# --- Normalisation des accents et de la casse ---
+def normalize_string(text):
+    """
+    Convertit une chaîne en minuscules et supprime les accents/caractères diacritiques,
+    tout en protégeant les booléens (True/False) et les NaN.
+    """
+    
+    # 1. Protection contre les NaN et None
+    if pd.isna(text) or text is None:
+        return text
+    
+    text_str = str(text)
+
+    # 2. **PROTECTION BOOLÉENNE (NOUVEAU)**
+    # Nous vérifions si la chaîne (en ignorant la casse) est 'true' ou 'false'
+    if text_str.lower() in ['true', 'false']:
+        # On peut soit laisser la chaîne telle quelle, soit la convertir en booléen Python natif.
+        # Nous la laissons en chaîne pour le moment, mais non modifiée.
+        return text
+    
+    # 3. Traitement standard du texte (minuscules et accents)
+    
+    # Convertir en minuscules (UNIQUEMENT les chaînes qui ne sont pas True/False)
+    text_str_lower = text_str.lower() 
+
+    # Décomposer les caractères (NFD)
+    normalized = unicodedata.normalize('NFD', text_str_lower)
+    
+    # Retirer les marques d'accent
+    text_no_accents = re.sub(r'[\u0300-\u036f]', '', normalized)
+    
+    return text_no_accents
+
+
+def normalize_all_text_columns(df):
+    """
+    Applique la normalisation à toutes les colonnes de type 'object' ou 'string' d'un DataFrame.
+    """
+    string_cols = df.select_dtypes(include=['object', 'string']).columns.tolist()
+    
+    print(f"Normalisation des colonnes de texte : {string_cols}")
+
+    for col in string_cols:
+        # Utiliser la fonction sécurisée
+        df[col] = df[col].apply(normalize_string)
+        
+    return df
+
 
 # ===============================
 # Exemple rapide d'utilisation
