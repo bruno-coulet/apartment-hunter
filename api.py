@@ -6,18 +6,28 @@ import numpy as np
 
 app = FastAPI()
 
+# Initialisation par défaut
+model = None
+scaler = None
+
 # Définir les chemins vers tes fichiers dans le dossier models/
 # Docker respectera cette structure si tu as bien fait COPY . .
-MODEL_PATH = "models/model.pkl"
+MODEL_PATH = "models/random_forest_model.pkl"
 SCALER_PATH = "models/scaler.pkl"
+
 
 # Chargement au démarrage
 if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
-    model = pickle.load(MODEL_PATH)
-    scaler = pickle.load(SCALER_PATH)
+    try:
+        model = pickle.load(MODEL_PATH)
+        scaler = pickle.load(SCALER_PATH)
+        print("✅ Modèle et Scaler chargés avec succès")
+    except Exception as e:
+        print(f"❌ Erreur lors du chargement des fichiers pkl : {e}")
 else:
-    print("⚠️ Attention: Fichiers modèles introuvables !")
-    
+    print(f"⚠️ Fichiers introuvables : {MODEL_PATH} ou {SCALER_PATH}")
+
+
 
 # --------- INPUT SCHEMA (match Streamlit payload) ----------
 class InputData(BaseModel):
@@ -67,21 +77,25 @@ def preprocess(payload: InputData) -> pd.DataFrame:
 
 @app.post("/predict")
 def predict(data: InputData):
+    # Vérification de sécurité
+    if model is None or scaler is None:
+        return {"error": "Le modèle ou le scaler n'est pas chargé sur le serveur."}
+
     try:
         X = preprocess(data)
         
-        # 1. Mise à l'échelle (si ton modèle a été entraîné avec un scaler)
+        # Transformation avec le scaler
         X_scaled = scaler.transform(X)
         
-        # 2. Prédiction réelle
+        # Prédiction
         prediction = model.predict(X_scaled)
         
-        return {
-            "prediction": float(prediction[0]),
-            "status": "success"
-        }
+        return {"prediction": int(prediction[0])}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Erreur lors de la prédiction : {str(e)}"}
+        
+
+        
 
 # @app.post("/predict")
 # def predict(data: InputData):
