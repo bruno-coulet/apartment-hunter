@@ -1,13 +1,23 @@
 [project]
 name = "apartment-hunter"
 version = "0.1.0"
-description = "Add your description here"
+description = "Application pour prédire le prix d'un bien immobilier sur Madrid"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "chardet>=5.2.0",
-    "ipykernel>=7.1.0",
-    "numpy>=2.3.5",
-    "pandas>=2.3.3",
-    "pyarrow>=22.0.0",
+    "fastapi>=0.109.0", # Versions stabilisées
+    "numpy>=1.26.0",
+    "pandas>=2.1.0",
+    "pyarrow>=14.0.0",
+    "scikit-learn>=1.3.0",
+    "uvicorn>=0.27.0",
+]
+
+# Optionnel : pour tes analyses dans les Notebooks sans alourdir Docker
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
 ]
