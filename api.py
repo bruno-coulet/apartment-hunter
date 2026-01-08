@@ -1,9 +1,23 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+import pickle, os
 import pandas as pd
 import numpy as np
 
 app = FastAPI()
+
+# Définir les chemins vers tes fichiers dans le dossier models/
+# Docker respectera cette structure si tu as bien fait COPY . .
+MODEL_PATH = "models/model.pkl"
+SCALER_PATH = "models/scaler.pkl"
+
+# Chargement au démarrage
+if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
+    model = pickle.load(MODEL_PATH)
+    scaler = pickle.load(SCALER_PATH)
+else:
+    print("⚠️ Attention: Fichiers modèles introuvables !")
+    
 
 # --------- INPUT SCHEMA (match Streamlit payload) ----------
 class InputData(BaseModel):
@@ -50,49 +64,68 @@ def preprocess(payload: InputData) -> pd.DataFrame:
     return df
 
 
+
 @app.post("/predict")
 def predict(data: InputData):
     try:
         X = preprocess(data)
-
-        # ---------- PREDICTION FAKE (demo) ----------
-        # Base €/m² (Madrid) -> juste pour une démo cohérente
-        base_eur_m2 = 3500
-
-        # Effet quartier (simple) : on simule un coefficient qui varie selon l'ID
-        # (dans un vrai modèle, neighborhood serait encodé)
-        neigh_factor = 0.85 + (X.loc[0, "neighborhood"] / 135) * 0.35  # ~0.85 -> ~1.20
-
-        # Bonus équipements (en €)
-        equip_bonus = (
-            X.loc[0, "has_lift"] * 12000
-            + X.loc[0, "has_parking"] * 18000
-            + X.loc[0, "has_pool"] * 25000
-            + X.loc[0, "has_garden"] * 20000
-            + X.loc[0, "has_storage_room"] * 8000
-        )
-
-        # Pénalité sous-sol
-        under_penalty = -15000 if X.loc[0, "is_floor_under"] == 1 else 0
-
-        # Bonus pièces / SDB (petit bonus, car déjà lié à la surface)
-        rooms_bonus = max(X.loc[0, "n_rooms"] - 1, 0) * 6000
-        baths_bonus = max(X.loc[0, "n_bathrooms"] - 1, 0) * 9000
-
-        price = (
-            X.loc[0, "sq_mt_built"] * base_eur_m2 * neigh_factor
-            + equip_bonus
-            + under_penalty
-            + rooms_bonus
-            + baths_bonus
-        )
-
+        
+        # 1. Mise à l'échelle (si ton modèle a été entraîné avec un scaler)
+        X_scaled = scaler.transform(X)
+        
+        # 2. Prédiction réelle
+        prediction = model.predict(X_scaled)
+        
         return {
-            "prediction": int(price),
-            "preprocessing_applied": True,
-            "features_used": list(X.columns),
-            "quality_factor": float(neigh_factor),
+            "prediction": float(prediction[0]),
+            "status": "success"
         }
-
     except Exception as e:
-        return {"error": f"Erreur lors du preprocessing/predict: {str(e)}"}
+        return {"error": str(e)}
+
+# @app.post("/predict")
+# def predict(data: InputData):
+#     try:
+#         X = preprocess(data)
+
+#         # ---------- PREDICTION FAKE (demo) ----------
+#         # Base €/m² (Madrid) -> juste pour une démo cohérente
+#         base_eur_m2 = 3500
+
+#         # Effet quartier (simple) : on simule un coefficient qui varie selon l'ID
+#         # (dans un vrai modèle, neighborhood serait encodé)
+#         neigh_factor = 0.85 + (X.loc[0, "neighborhood"] / 135) * 0.35  # ~0.85 -> ~1.20
+
+#         # Bonus équipements (en €)
+#         equip_bonus = (
+#             X.loc[0, "has_lift"] * 12000
+#             + X.loc[0, "has_parking"] * 18000
+#             + X.loc[0, "has_pool"] * 25000
+#             + X.loc[0, "has_garden"] * 20000
+#             + X.loc[0, "has_storage_room"] * 8000
+#         )
+
+#         # Pénalité sous-sol
+#         under_penalty = -15000 if X.loc[0, "is_floor_under"] == 1 else 0
+
+#         # Bonus pièces / SDB (petit bonus, car déjà lié à la surface)
+#         rooms_bonus = max(X.loc[0, "n_rooms"] - 1, 0) * 6000
+#         baths_bonus = max(X.loc[0, "n_bathrooms"] - 1, 0) * 9000
+
+#         price = (
+#             X.loc[0, "sq_mt_built"] * base_eur_m2 * neigh_factor
+#             + equip_bonus
+#             + under_penalty
+#             + rooms_bonus
+#             + baths_bonus
+#         )
+
+#         return {
+#             "prediction": int(price),
+#             "preprocessing_applied": True,
+#             "features_used": list(X.columns),
+#             "quality_factor": float(neigh_factor),
+#         }
+
+#     except Exception as e:
+#         return {"error": f"Erreur lors du preprocessing/predict: {str(e)}"}

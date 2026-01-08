@@ -24,4 +24,4 @@ EXPOSE 8000
 
 # 8. Commande pour lancer l'API
 # uv run permet d'exécuter dans l'environnement virtuel créé par uv sync
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
