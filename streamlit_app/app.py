@@ -7,6 +7,17 @@ import numpy as np
 # --- CONFIGURATION ---
 API_URL = "http://api:8000/predict"
 
+# --- HELPERS ---
+def format_euros(value: float) -> str:
+    try:
+        # Format with US locale then swap separators to FR style
+        s = f"{float(value):,.2f}"  # e.g., 389,788.00
+        s = s.replace(",", "X").replace(".", ",").replace("X", ".")  # -> 389.788,00
+        return f"{s} €"
+    except Exception:
+        # Fallback: round to 2 decimals without locale changes
+        return f"{round(float(value), 2)} €"
+
 @st.cache_resource
 def load_config():
     """Charge la config depuis le notebook"""
@@ -69,28 +80,28 @@ with st.form("prediction_form"):
         feature_range = ranges.get("sq_mt_built", {})
         sq_mt_built = st.number_input(
             "Surface (m²)",
-            min_value=float(feature_range.get("min", 10)),
-            max_value=float(feature_range.get("max", 1000)),
-            value=float(feature_range.get("mean", 75)),
-            step=1.0
+            min_value=int(feature_range.get("min", 10)),
+            max_value=int(feature_range.get("max", 1000)),
+            value=int(feature_range.get("mean", 75)),
+            step=1
         )
         
         feature_range = ranges.get("n_rooms", {})
         n_rooms = st.number_input(
             "Chambres",
-            min_value=float(feature_range.get("min", 0)),
-            max_value=float(feature_range.get("max", 15)),
-            value=float(feature_range.get("mean", 2)),
-            step=1.0
+            min_value=int(feature_range.get("min", 0)),
+            max_value=int(feature_range.get("max", 15)),
+            value=int(feature_range.get("mean", 2)),
+            step=1
         )
         
         feature_range = ranges.get("n_bathrooms", {})
         n_bathrooms = st.number_input(
             "Salles de bain",
-            min_value=float(feature_range.get("min", 1)),
-            max_value=float(feature_range.get("max", 10)),
-            value=float(feature_range.get("mean", 1)),
-            step=1.0
+            min_value=int(feature_range.get("min", 1)),
+            max_value=int(feature_range.get("max", 10)),
+            value=int(feature_range.get("mean", 1)),
+            step=1
         )
     
     with col2:
@@ -116,7 +127,7 @@ if submit_button:
     payload = {
         "sq_mt_built": float(sq_mt_built),
         "n_rooms": int(n_rooms),
-        "n_bathrooms": float(n_bathrooms),
+        "n_bathrooms": int(n_bathrooms),
         "neighborhood": int(neighborhood),
         "has_lift": int(has_lift),
         "has_parking": int(has_parking),
@@ -134,12 +145,13 @@ if submit_button:
                 result = response.json()
                 
                 if "prediction" in result:
-                    prix_log = result["prediction"]
-                    prix_final = np.exp(prix_log)  # Convertir du log
-                    
+                    prix_euros = result["prediction"]
                     st.balloons()
                     st.success("✅ Estimation terminée!")
-                    st.metric(label="💰 Prix estimé", value=f"{prix_final:,.0f} €")
+                    st.metric(label="💰 Prix estimé", value=format_euros(prix_euros))
+                    # Info additionnelle si disponible
+                    if "prediction_log" in result:
+                        st.caption(f"(log-prix: {result['prediction_log']:.4f})")
                     
                 elif "error" in result:
                     st.error(f"❌ Erreur API: {result['error']}")

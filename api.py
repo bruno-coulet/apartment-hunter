@@ -42,6 +42,16 @@ def load_assets():
             model = joblib.load(MODEL_PATH)
             preprocessor = joblib.load(PREPROCESSOR_PATH)
             print("✅ Modèle et Préprocesseur chargés")
+            
+            # Extraire les catégories valides du OneHotEncoder
+            print("\n📊 Catégories du preprocessor:")
+            for name, transformer, cols in preprocessor.transformers_:
+                print(f"  {name}: {cols}")
+                if name == "cat" and hasattr(transformer, 'named_steps'):
+                    onehot = transformer.named_steps.get('onehotencoder')
+                    if onehot and hasattr(onehot, 'categories_'):
+                        for i, col in enumerate(cols):
+                            print(f"    - {col}: {list(onehot.categories_[i][:10])}...")
         else:
             print("❌ Erreur : Fichiers .pkl introuvables dans /models")
             
@@ -55,7 +65,7 @@ load_assets()
 class PropertyData(BaseModel):
     sq_mt_built: float
     n_rooms: int
-    n_bathrooms: int
+    n_bathrooms: float
     neighborhood: int
     has_lift: int = 0
     has_parking: int = 0
@@ -63,11 +73,6 @@ class PropertyData(BaseModel):
     has_garden: int = 0
     has_storage_room: int = 0
     is_floor_under: int = 0
-    has_parking: int
-    has_pool: int
-    has_garden: int
-    has_storage_room: int
-    is_floor_under: int
 
 # --- ROUTES ---
 
@@ -82,35 +87,62 @@ def home():
 @app.post("/predict")
 def predict(data: PropertyData):
     try:
-        # 1. Préparation des données (on ne garde que nos 10 colonnes)
+        # 1. Préparation des données
         input_dict = data.model_dump()
         df_input = pd.DataFrame([input_dict])
         
-        # On s'assure que l'ordre des colonnes est identique à l'entraînement
+        print(f"\n📥 Input reçu: {input_dict}")
+        
+        # 1b. Convertir neighborhood en STRING (c'est une catégorie)
+        df_input["neighborhood"] = df_input["neighborhood"].astype(str)
+        print(f"   neighborhood converti en string: {df_input['neighborhood'].iloc[0]}")
+        
+        # 2. Sélectionner les 10 colonnes dans le bon ordre
         useful_features = [
             "sq_mt_built", "n_rooms", "n_bathrooms", "neighborhood",
             "has_lift", "has_parking", "has_pool", "has_garden",
             "has_storage_room", "is_floor_under"
         ]
         df_final = df_input[useful_features]
-
-        # 2. Transformation par le preprocessor (Scaling, OneHot, etc.)
+        
+        print(f"📋 DataFrame:\n{df_final}")
+        print(f"   Types: {df_final.dtypes.to_dict()}")
+        
+        # 3. Transformation par le preprocessor
         X_processed = preprocessor.transform(df_final)
-
-        # 3. Prédiction brute (Le modèle répond 13.0 car il a appris des logs)
+        
+        print(f"✅ Preprocessing OK - shape: {X_processed.shape}")
+        print(f"   Min: {X_processed.min():.6f}, Max: {X_processed.max():.6f}")
+        print(f"   Valeurs (premiers 15): {X_processed[0][:15]}")
+        
+        # 4. Prédiction (en LOG)
         prediction_log = model.predict(X_processed)[0]
-
-        # 4. TRANSFORMATION INVERSE (Passage du Log à l'Euro)
-        # C'est ici qu'on gère le np.exp()
+        
+        print(f"📊 Prédiction LOG: {prediction_log:.6f}")
+        
+        # 5. Vérifier que la prédiction est valide
+        if np.isnan(prediction_log) or np.isinf(prediction_log):
+            print(f"❌ Prédiction LOG invalide: {prediction_log}")
+            return {"error": f"Prédiction invalide: {prediction_log}"}
+        
+        # 6. Conversion inverse (LOG -> EUROS)
         prediction_euros = np.exp(prediction_log)
-
-        # 5. Retour du résultat
+        
+        print(f"💰 Prédiction EUROS: {prediction_euros:.2f}")
+        
+        # Vérifier le résultat final
+        if np.isnan(prediction_euros) or np.isinf(prediction_euros):
+            print(f"❌ Prix final invalide: {prediction_euros}")
+            return {"error": f"Prix final invalide après conversion"}
+        
         return {
-            "prediction": float(prediction_euros), # Conversion en float standard pour JSON
-            "status": "success",
-            "unit": "EUR"
+            "prediction": float(prediction_euros),
+            "prediction_log": float(prediction_log),
+            "status": "success"
         }
 
     except Exception as e:
-        # En cas d'erreur (ex: quartier inconnu), on renvoie le message à Streamlit
+        print(f"❌ Erreur: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
