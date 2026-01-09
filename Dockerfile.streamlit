@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+# Installation de uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+# On utilise pyproject.toml et uv.lock
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-cache --no-dev
+
+# On copie le reste du projet
+COPY . .
+
+EXPOSE 8501
+
+# La commande finale est gérée par le docker-compose.yml, 
+# mais on peut mettre celle-ci par défaut
+CMD ["uv", "run", "streamlit", "run", "streamlit_app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

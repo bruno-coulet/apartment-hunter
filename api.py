@@ -1,145 +1,171 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import pickle, os
+import joblib
+import json
+import os
 import pandas as pd
 import numpy as np
+import traceback
 
 app = FastAPI()
 
 # Initialisation par défaut
 model = None
-scaler = None
+preprocessor = None
+model_config = None
+load_error = None
 
 # Définir les chemins vers tes fichiers dans le dossier models/
-# Docker respectera cette structure si tu as bien fait COPY . .
-MODEL_PATH = "models/random_forest_model.pkl"
-SCALER_PATH = "models/scaler.pkl"
-
+MODEL_PATH = "models/ridge_model.pkl"
+PREPROCESSOR_PATH = "models/preprocessor.pkl"
+CONFIG_PATH = "models/model_config.json"
 
 # Chargement au démarrage
-if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
-    try:
-        model = pickle.load(MODEL_PATH)
-        scaler = pickle.load(SCALER_PATH)
-        print("✅ Modèle et Scaler chargés avec succès")
-    except Exception as e:
-        print(f"❌ Erreur lors du chargement des fichiers pkl : {e}")
-else:
-    print(f"⚠️ Fichiers introuvables : {MODEL_PATH} ou {SCALER_PATH}")
+try:
+    # Charger la configuration
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, "r") as f:
+            model_config = json.load(f)
+        print("✅ Configuration modèle chargée")
+    else:
+        print(f"⚠️ Config manquante: {CONFIG_PATH}")
+    
+    # Charger le modèle
+    if os.path.exists(MODEL_PATH):
+        model = joblib.load(MODEL_PATH)
+        print("✅ Modèle Ridge chargé")
+    else:
+        load_error = f"Modèle manquant: {MODEL_PATH}"
+        print(f"❌ {load_error}")
+    
+    # Charger le preprocessor
+    if os.path.exists(PREPROCESSOR_PATH):
+        preprocessor = joblib.load(PREPROCESSOR_PATH)
+        print("✅ Préprocesseur chargé")
+    else:
+        load_error = f"Préprocesseur manquant: {PREPROCESSOR_PATH}"
+        print(f"❌ {load_error}")
+    
+    if model and preprocessor and model_config:
+        print("✅ Système prêt pour les prédictions")
+        
+except Exception as e:
+    print("❌ Erreur de chargement détaillée:")
+    traceback.print_exc()
+    load_error = str(e)
 
 
 
-# --------- INPUT SCHEMA (match Streamlit payload) ----------
+# --------- INPUT SCHEMA ----------
 class InputData(BaseModel):
     sq_mt_built: float
     n_rooms: int
     n_bathrooms: float
-    neighborhood: int
-
-    has_lift: int = 0
-    has_parking: int = 0
-    has_pool: int = 0
-    has_garden: int = 0
-    has_storage_room: int = 0
+    floor: int
     is_floor_under: int = 0
-
+    rent_price: float
+    buy_price_by_area: float
+    is_renewal_needed: int = 0
+    is_new_development: int = 0
+    has_central_heating: int = 0
+    has_individual_heating: int = 0
+    has_ac: int = 0
+    has_fitted_wardrobes: int = 0
+    has_lift: int = 0
+    is_exterior: int = 0
+    has_garden: int = 0
+    has_pool: int = 0
+    has_terrace: int = 0
+    has_balcony: int = 0
+    has_storage_room: int = 0
+    is_accessible: int = 0
+    has_green_zones: int = 0
+    has_parking: int = 0
+    product: str
+    neighborhood: int
 
 @app.get("/")
 def read_root():
-    return {"message": "API d'estimation immobilière (features df_model)"}
+    return {
+        "message": "API d'estimation immobilière Madrid",
+        "status": "ready" if model and preprocessor else "error",
+        "error": load_error
+    }
 
+@app.get("/config")
+def get_config():
+    """Retourne la configuration du modèle (colonnes attendues, etc)"""
+    if not model_config:
+        return {"error": "Configuration non disponible"}
+    
+    return {
+        "input_columns": model_config["input_columns"],
+        "n_input_features": len(model_config["input_columns"]),
+        "n_preprocessed_features": len(model_config["preprocessed_columns"]),
+        "model_type": model_config["model_type"]
+    }
+
+@app.get("/columns")
+def get_columns():
+    """Retourne les listes complètes des colonnes"""
+    if not model_config:
+        return {"error": "Configuration non disponible"}
+    
+    return model_config
 
 def preprocess(payload: InputData) -> pd.DataFrame:
-    """Préprocessing simple : types + bornes réalistes + dataframe 1 ligne."""
     df = pd.DataFrame([payload.model_dump()])
+    
+    # Conversion forcée en numérique pour toutes les colonnes numériques
+    numeric_cols = [
+        "sq_mt_built", "n_rooms", "n_bathrooms", "floor", 
+        "rent_price", "buy_price_by_area"
+    ]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Types
-    df["sq_mt_built"] = pd.to_numeric(df["sq_mt_built"], errors="coerce")
-    df["n_rooms"] = pd.to_numeric(df["n_rooms"], errors="coerce")
-    df["n_bathrooms"] = pd.to_numeric(df["n_bathrooms"], errors="coerce")
-    df["neighborhood"] = pd.to_numeric(df["neighborhood"], errors="coerce")
-
-    bin_cols = ["has_lift","has_parking","has_pool","has_garden","has_storage_room","is_floor_under"]
-    for c in bin_cols:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0).clip(0, 1).astype(int)
-
-    # Bornes simples (évite valeurs incohérentes)
-    df["sq_mt_built"] = df["sq_mt_built"].clip(10, 1000)
-    df["n_rooms"] = df["n_rooms"].clip(0, 24)
-    df["n_bathrooms"] = df["n_bathrooms"].clip(1, 16)
-
-    # Neighborhood (dans ton dataset : 1..135)
-    df["neighborhood"] = df["neighborhood"].clip(1, 135).astype(int)
+    # Nettoyage des colonnes binaires (0/1)
+    binary_cols = [
+        "is_floor_under", "is_renewal_needed", "is_new_development",
+        "has_central_heating", "has_individual_heating", "has_ac",
+        "has_fitted_wardrobes", "has_lift", "is_exterior", "has_garden",
+        "has_pool", "has_terrace", "has_balcony", "has_storage_room",
+        "is_accessible", "has_green_zones", "has_parking"
+    ]
+    for col in binary_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).clip(0, 1).astype(int)
 
     return df
 
-
-
 @app.post("/predict")
 def predict(data: InputData):
-    # Vérification de sécurité
-    if model is None or scaler is None:
-        return {"error": "Le modèle ou le scaler n'est pas chargé sur le serveur."}
+    if model is None or preprocessor is None:
+        return {"error": "Modèle ou préprocesseur non chargé"}
 
     try:
-        X = preprocess(data)
+        # 1. Créer DataFrame depuis les données d'entrée
+        df = preprocess(data)
         
-        # Transformation avec le scaler
-        X_scaled = scaler.transform(X)
+        # 2. Vérifier que toutes les colonnes requises sont présentes
+        required_cols = model_config["input_columns"]
+        missing_cols = set(required_cols) - set(df.columns)
+        if missing_cols:
+            return {"error": f"Colonnes manquantes: {missing_cols}"}
         
-        # Prédiction
-        prediction = model.predict(X_scaled)
+        # 3. S'assurer de l'ordre des colonnes
+        df = df[required_cols]
         
-        return {"prediction": int(prediction[0])}
+        # 4. Transformation avec le preprocessor
+        X_transformed = preprocessor.transform(df)
+        
+        # 5. Prédiction
+        prediction = model.predict(X_transformed)[0]
+        
+        return {
+            "prediction": float(prediction),
+            "status": "success"
+        }
     except Exception as e:
-        return {"error": f"Erreur lors de la prédiction : {str(e)}"}
-        
-
-        
-
-# @app.post("/predict")
-# def predict(data: InputData):
-#     try:
-#         X = preprocess(data)
-
-#         # ---------- PREDICTION FAKE (demo) ----------
-#         # Base €/m² (Madrid) -> juste pour une démo cohérente
-#         base_eur_m2 = 3500
-
-#         # Effet quartier (simple) : on simule un coefficient qui varie selon l'ID
-#         # (dans un vrai modèle, neighborhood serait encodé)
-#         neigh_factor = 0.85 + (X.loc[0, "neighborhood"] / 135) * 0.35  # ~0.85 -> ~1.20
-
-#         # Bonus équipements (en €)
-#         equip_bonus = (
-#             X.loc[0, "has_lift"] * 12000
-#             + X.loc[0, "has_parking"] * 18000
-#             + X.loc[0, "has_pool"] * 25000
-#             + X.loc[0, "has_garden"] * 20000
-#             + X.loc[0, "has_storage_room"] * 8000
-#         )
-
-#         # Pénalité sous-sol
-#         under_penalty = -15000 if X.loc[0, "is_floor_under"] == 1 else 0
-
-#         # Bonus pièces / SDB (petit bonus, car déjà lié à la surface)
-#         rooms_bonus = max(X.loc[0, "n_rooms"] - 1, 0) * 6000
-#         baths_bonus = max(X.loc[0, "n_bathrooms"] - 1, 0) * 9000
-
-#         price = (
-#             X.loc[0, "sq_mt_built"] * base_eur_m2 * neigh_factor
-#             + equip_bonus
-#             + under_penalty
-#             + rooms_bonus
-#             + baths_bonus
-#         )
-
-#         return {
-#             "prediction": int(price),
-#             "preprocessing_applied": True,
-#             "features_used": list(X.columns),
-#             "quality_factor": float(neigh_factor),
-#         }
-
-#     except Exception as e:
-#         return {"error": f"Erreur lors du preprocessing/predict: {str(e)}"}
+        traceback.print_exc()
+        return {"error": f"Erreur prédiction: {str(e)}"}

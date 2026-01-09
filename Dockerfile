@@ -1,27 +1,24 @@
-# 1. Image de base : stable et légère
+# Utilisation de Python 3.12 (plus performant)
 FROM python:3.12-slim
 
-# 2. Installation de 'uv' : on récupère l'exécutable depuis l'image officielle
+# On récupère l'exécutable uv depuis l'image officielle
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# 3. Répertoire de travail
 WORKDIR /app
 
-# 4. Copie des fichiers de configuration uniquement
-# On fait cela en premier pour profiter du cache Docker (plus rapide)
+# On copie uniquement les fichiers de configuration uv (indispensable pour le cache)
 COPY pyproject.toml uv.lock ./
 
-# 5. Installation des dépendances
-# --frozen : utilise strictement le fichier lock
-# --no-dev : n'installe PAS matplotlib/seaborn (inutile en production)
+# Installation des dépendances avec uv (fini pip et requirements.txt !)
 RUN uv sync --frozen --no-cache --no-dev
 
-# 6. Copie du reste du projet (ton code, ton modèle .pkl)
+# Copier tout le projet (api.py, cleaning_utils.py, dossiers models et data_model)
 COPY . .
 
-# 7. Port utilisé par l'application
+# Configuration de l'environnement
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8000
 
-# 8. Commande pour lancer l'API
-# uv run permet d'exécuter dans l'environnement virtuel créé par uv sync
+# Lancement sécurisé via uv
 CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
