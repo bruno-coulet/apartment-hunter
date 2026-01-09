@@ -9,163 +9,108 @@ import traceback
 
 app = FastAPI()
 
-# Initialisation par défaut
-model = None
-preprocessor = None
-model_config = None
-load_error = None
-
-# Définir les chemins vers tes fichiers dans le dossier models/
+# --- CONFIGURATION DES CHEMINS ---
 MODEL_PATH = "models/ridge_model.pkl"
 PREPROCESSOR_PATH = "models/preprocessor.pkl"
 CONFIG_PATH = "models/model_config.json"
 
-# Chargement au démarrage
-try:
-    # Charger la configuration
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r") as f:
-            model_config = json.load(f)
-        print("✅ Configuration modèle chargée")
-    else:
-        print(f"⚠️ Config manquante: {CONFIG_PATH}")
-    
-    # Charger le modèle
-    if os.path.exists(MODEL_PATH):
-        model = joblib.load(MODEL_PATH)
-        print("✅ Modèle Ridge chargé")
-    else:
-        load_error = f"Modèle manquant: {MODEL_PATH}"
-        print(f"❌ {load_error}")
-    
-    # Charger le preprocessor
-    if os.path.exists(PREPROCESSOR_PATH):
-        preprocessor = joblib.load(PREPROCESSOR_PATH)
-        print("✅ Préprocesseur chargé")
-    else:
-        load_error = f"Préprocesseur manquant: {PREPROCESSOR_PATH}"
-        print(f"❌ {load_error}")
-    
-    if model and preprocessor and model_config:
-        print("✅ Système prêt pour les prédictions")
-        
-except Exception as e:
-    print("❌ Erreur de chargement détaillée:")
-    traceback.print_exc()
-    load_error = str(e)
+# --- VARIABLES GLOBALES ---
+model = None
+preprocessor = None
+config = None
 
+# --- FONCTION DE CHARGEMENT ---
+def load_assets():
+    global model, preprocessor, config
+    try:
+        # 1. Chargement de la configuration JSON
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r") as f:
+                config = json.load(f)
+            print("✅ Configuration JSON chargée")
+        else:
+            print("⚠️ Config manquante: models/model_config.json")
+            # Fallback sur les 10 colonnes si le fichier manque
+            config = {"input_columns": [
+                "sq_mt_built", "n_rooms", "n_bathrooms", "neighborhood",
+                "has_lift", "has_parking", "has_pool", "has_garden",
+                "has_storage_room", "is_floor_under"
+            ]}
 
+        # 2. Chargement du Modèle et Préprocesseur
+        if os.path.exists(MODEL_PATH) and os.path.exists(PREPROCESSOR_PATH):
+            model = joblib.load(MODEL_PATH)
+            preprocessor = joblib.load(PREPROCESSOR_PATH)
+            print("✅ Modèle et Préprocesseur chargés")
+        else:
+            print("❌ Erreur : Fichiers .pkl introuvables dans /models")
+            
+    except Exception as e:
+        print(f"❌ Erreur lors de l'initialisation : {e}")
 
-# --------- INPUT SCHEMA ----------
-class InputData(BaseModel):
+# Exécuter le chargement au démarrage
+load_assets()
+
+# --- SCHÉMA DE DONNÉES (Pydantic) ---
+class PropertyData(BaseModel):
     sq_mt_built: float
     n_rooms: int
-    n_bathrooms: float
-    floor: int
-    is_floor_under: int = 0
-    rent_price: float
-    buy_price_by_area: float
-    is_renewal_needed: int = 0
-    is_new_development: int = 0
-    has_central_heating: int = 0
-    has_individual_heating: int = 0
-    has_ac: int = 0
-    has_fitted_wardrobes: int = 0
-    has_lift: int = 0
-    is_exterior: int = 0
-    has_garden: int = 0
-    has_pool: int = 0
-    has_terrace: int = 0
-    has_balcony: int = 0
-    has_storage_room: int = 0
-    is_accessible: int = 0
-    has_green_zones: int = 0
-    has_parking: int = 0
-    product: str
+    n_bathrooms: int
     neighborhood: int
+    has_lift: int = 0
+    has_parking: int = 0
+    has_pool: int = 0
+    has_garden: int = 0
+    has_storage_room: int = 0
+    is_floor_under: int = 0
+    has_parking: int
+    has_pool: int
+    has_garden: int
+    has_storage_room: int
+    is_floor_under: int
+
+# --- ROUTES ---
 
 @app.get("/")
-def read_root():
+def home():
     return {
-        "message": "API d'estimation immobilière Madrid",
-        "status": "ready" if model and preprocessor else "error",
-        "error": load_error
+        "status": "API is running",
+        "model_loaded": model is not None,
+        "config_loaded": config is not None
     }
-
-@app.get("/config")
-def get_config():
-    """Retourne la configuration du modèle (colonnes attendues, etc)"""
-    if not model_config:
-        return {"error": "Configuration non disponible"}
-    
-    return {
-        "input_columns": model_config["input_columns"],
-        "n_input_features": len(model_config["input_columns"]),
-        "n_preprocessed_features": len(model_config["preprocessed_columns"]),
-        "model_type": model_config["model_type"]
-    }
-
-@app.get("/columns")
-def get_columns():
-    """Retourne les listes complètes des colonnes"""
-    if not model_config:
-        return {"error": "Configuration non disponible"}
-    
-    return model_config
-
-def preprocess(payload: InputData) -> pd.DataFrame:
-    df = pd.DataFrame([payload.model_dump()])
-    
-    # Conversion forcée en numérique pour toutes les colonnes numériques
-    numeric_cols = [
-        "sq_mt_built", "n_rooms", "n_bathrooms", "floor", 
-        "rent_price", "buy_price_by_area"
-    ]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    # Nettoyage des colonnes binaires (0/1)
-    binary_cols = [
-        "is_floor_under", "is_renewal_needed", "is_new_development",
-        "has_central_heating", "has_individual_heating", "has_ac",
-        "has_fitted_wardrobes", "has_lift", "is_exterior", "has_garden",
-        "has_pool", "has_terrace", "has_balcony", "has_storage_room",
-        "is_accessible", "has_green_zones", "has_parking"
-    ]
-    for col in binary_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).clip(0, 1).astype(int)
-
-    return df
 
 @app.post("/predict")
-def predict(data: InputData):
-    if model is None or preprocessor is None:
-        return {"error": "Modèle ou préprocesseur non chargé"}
-
+def predict(data: PropertyData):
     try:
-        # 1. Créer DataFrame depuis les données d'entrée
-        df = preprocess(data)
+        # 1. Préparation des données (on ne garde que nos 10 colonnes)
+        input_dict = data.model_dump()
+        df_input = pd.DataFrame([input_dict])
         
-        # 2. Vérifier que toutes les colonnes requises sont présentes
-        required_cols = model_config["input_columns"]
-        missing_cols = set(required_cols) - set(df.columns)
-        if missing_cols:
-            return {"error": f"Colonnes manquantes: {missing_cols}"}
-        
-        # 3. S'assurer de l'ordre des colonnes
-        df = df[required_cols]
-        
-        # 4. Transformation avec le preprocessor
-        X_transformed = preprocessor.transform(df)
-        
-        # 5. Prédiction
-        prediction = model.predict(X_transformed)[0]
-        
+        # On s'assure que l'ordre des colonnes est identique à l'entraînement
+        useful_features = [
+            "sq_mt_built", "n_rooms", "n_bathrooms", "neighborhood",
+            "has_lift", "has_parking", "has_pool", "has_garden",
+            "has_storage_room", "is_floor_under"
+        ]
+        df_final = df_input[useful_features]
+
+        # 2. Transformation par le preprocessor (Scaling, OneHot, etc.)
+        X_processed = preprocessor.transform(df_final)
+
+        # 3. Prédiction brute (Le modèle répond 13.0 car il a appris des logs)
+        prediction_log = model.predict(X_processed)[0]
+
+        # 4. TRANSFORMATION INVERSE (Passage du Log à l'Euro)
+        # C'est ici qu'on gère le np.exp()
+        prediction_euros = np.exp(prediction_log)
+
+        # 5. Retour du résultat
         return {
-            "prediction": float(prediction),
-            "status": "success"
+            "prediction": float(prediction_euros), # Conversion en float standard pour JSON
+            "status": "success",
+            "unit": "EUR"
         }
+
     except Exception as e:
-        traceback.print_exc()
-        return {"error": f"Erreur prédiction: {str(e)}"}
+        # En cas d'erreur (ex: quartier inconnu), on renvoie le message à Streamlit
+        return {"error": str(e)}
