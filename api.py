@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
+
+
+
 import pickle
 import os
 from pathlib import Path
@@ -38,6 +41,7 @@ class InputData(BaseModel):
     n_rooms: int
     n_bathrooms: float
     neighborhood: int
+    product: str  # Type de bien (appartement, maison, etc.)
 
     has_lift: int = 0
     has_parking: int = 0
