@@ -1,4 +1,18 @@
-"""Interface Streamlit pour estimer le prix d'un bien à Madrid."""
+"""Interface Streamlit pour estimer le prix d'un bien immobilier à Madrid.
+
+Cette application expose un formulaire à 3 colonnes :
+- Gauche : caractéristiques principales (surface, pièces, quartier)
+- Milieu : équipements et prestations
+- Droite : bouton de soumission et affichage du résultat
+
+L'estimation est réalisée par une API FastAPI connectée à un modèle Ridge
+entraîné sur des prix logarithmiques.
+
+Cartouche :
+  Fichier : streamlit_app/app.py
+  Rôle : interface utilisateur Streamlit
+  Date : 2026-02-07
+"""
 
 import json
 import os
@@ -97,6 +111,7 @@ st.markdown("""
     Estimation du prix d'achat d'un appartement à Madrid basée sur le **Machine Learning**.
 """)
 
+
 # Réduction de la hauteur perçue pour un rendu paysage sans scroll inutile
 
 # Récupérer les valeurs de quartier depuis la config
@@ -107,13 +122,14 @@ neighborhood_mapping = load_neighborhood_mapping()
 with st.form("prediction_form"):
     st.subheader("📋 Caractéristiques du bien")
     
-    col1, col2 = st.columns(2)
+    # répartition horizontale des 3 colonnes
+    col_left, col_mid, col_right = st.columns([1, 1, 1])
     
     numeric_features = config.get("numeric_features", [])
     ranges = config.get("ranges", {})
-    
-    # Inputs numériques
-    with col1:
+
+    # COLONNE GAUCHE : Surface, Chambres, Salles de bain, Quartier
+    with col_left:
         feature_range = ranges.get("sq_mt_built", {})
         sq_mt_built = st.number_input(
             "Surface (m²)",
@@ -142,28 +158,28 @@ with st.form("prediction_form"):
             step=1,
             format="%d"
         )
-    
-    with col2:
+        
         neighborhood = st.selectbox(
             "Quartier",
             options=neighborhoods,
             format_func=lambda x: f"{x} - {neighborhood_mapping.get(x, 'Quartier inconnu')}",
         )
-        is_floor_under = st.checkbox("Sous-sol", value=False)
-        st.write("**Équipements :**")
     
-    # Checkboxes pour les équipements
-    col1, col2, col3 = st.columns(3)
-    with col1:
+    # COLONNE MILIEU : Tous les équipements
+    with col_mid:
+        st.write("**Équipements :**")
         has_lift = st.checkbox("Ascenseur", value=True)
         has_parking = st.checkbox("Parking")
-    with col2:
         has_pool = st.checkbox("Piscine")
         has_garden = st.checkbox("Jardin")
-    with col3:
         has_storage_room = st.checkbox("Cave/Débarras")
+        is_floor_under = st.checkbox("Sous-sol", value=False)
     
-    submit_button = st.form_submit_button("🔮 Estimer le prix")
+    # COLONNE DROITE : Bouton et résultat
+    with col_right:
+        submit_button = st.form_submit_button("🔮 Estimer\nle prix", use_container_width=True)
+        estimation_placeholder = st.empty()
+    
 
 # --- LOGIQUE DE PRÉDICTION ---
 if submit_button:
@@ -189,12 +205,11 @@ if submit_button:
                 
                 if "prediction" in result:
                     prix_euros = result["prediction"]
-                    st.balloons()
-                    st.success("✅ Estimation terminée!")
-                    st.metric(label="💰 Prix estimé", value=format_euros(prix_euros))
-                    # Info additionnelle si disponible
-                    if "prediction_log" in result:
-                        st.caption(f"(log-prix: {result['prediction_log']:.4f})")
+                    with estimation_placeholder.container():
+                        st.success("✅ Estimation\ntérminée!")
+                        st.metric(label="💰 Prix", value=format_euros(prix_euros))
+                        if "prediction_log" in result:
+                            st.caption(f"(log: {result['prediction_log']:.4f})")
                     
                 elif "error" in result:
                     st.error(f"❌ Erreur API: {result['error']}")
@@ -214,7 +229,3 @@ if submit_button:
 st.divider()
 st.caption("Projet étudiant - Data Science & Cloud Deployment")
 
-# --- Cartouche ---
-# Fichier : streamlit_app/app.py
-# Rôle : interface utilisateur Streamlit
-# Date : 2026-02-07
