@@ -1,8 +1,13 @@
-import streamlit as st
-import requests
-import os
+"""Interface Streamlit pour estimer le prix d'un bien à Madrid."""
+
 import json
+import os
+import re
+
 import numpy as np
+import pandas as pd
+import requests
+import streamlit as st
 
 # --- CONFIGURATION ---
 API_URL = "http://api:8000/predict"
@@ -20,7 +25,7 @@ def format_euros(value: float) -> str:
 
 @st.cache_resource
 def load_config():
-    """Charge la config depuis le notebook"""
+    """Charge la config Streamlit générée lors de l'entraînement."""
     config_paths = ["models/streamlit_config.json", "../models/streamlit_config.json"]
     for path in config_paths:
         if os.path.exists(path):
@@ -38,10 +43,40 @@ def load_config():
 
 config = load_config()
 
+
+@st.cache_data
+def load_neighborhood_mapping() -> dict[int, str]:
+    """Construit un mapping id -> nom de quartier depuis le CSV brut.
+
+    Retourne un dictionnaire {id: nom}. En cas d'échec, renvoie un dict vide.
+    """
+    csv_path = "raw_data/houses_madrid.csv"
+    if not os.path.exists(csv_path):
+        return {}
+
+    # Lecture robuste (accents)
+    try:
+        df = pd.read_csv(csv_path, encoding="latin-1")
+    except Exception:
+        df = pd.read_csv(csv_path)
+
+    if "neighborhood_id" not in df.columns:
+        return {}
+
+    mapping: dict[int, str] = {}
+    pattern = re.compile(r"Neighborhood\s+(\d+):\s*([^\(\-]+)")
+    for raw in df["neighborhood_id"].dropna().unique().tolist():
+        match = pattern.search(str(raw))
+        if match:
+            idx = int(match.group(1))
+            name = match.group(2).strip()
+            mapping[idx] = name
+    return mapping
+
 st.set_page_config(
     page_title="Madrid Apartment Hunter",
     page_icon="🏙️",
-    layout="centered"
+    layout="wide"
 )
 
 # --- CHARGEMENT DU CSS ---
@@ -62,10 +97,12 @@ st.markdown("""
     Estimation du prix d'achat d'un appartement à Madrid basée sur le **Machine Learning**.
 """)
 
-st.divider()
+# Réduction de la hauteur perçue pour un rendu paysage sans scroll inutile
 
 # Récupérer les valeurs de quartier depuis la config
 neighborhoods = config.get("categorical_values", {}).get("neighborhood", list(range(1, 136)))
+neighborhoods = [int(n) for n in neighborhoods]
+neighborhood_mapping = load_neighborhood_mapping()
 
 with st.form("prediction_form"):
     st.subheader("📋 Caractéristiques du bien")
@@ -107,7 +144,11 @@ with st.form("prediction_form"):
         )
     
     with col2:
-        neighborhood = st.selectbox("Quartier", options=neighborhoods)
+        neighborhood = st.selectbox(
+            "Quartier",
+            options=neighborhoods,
+            format_func=lambda x: f"{x} - {neighborhood_mapping.get(x, 'Quartier inconnu')}",
+        )
         is_floor_under = st.checkbox("Sous-sol", value=False)
         st.write("**Équipements :**")
     
@@ -172,3 +213,8 @@ if submit_button:
 
 st.divider()
 st.caption("Projet étudiant - Data Science & Cloud Deployment")
+
+# --- Cartouche ---
+# Fichier : streamlit_app/app.py
+# Rôle : interface utilisateur Streamlit
+# Date : 2026-02-07

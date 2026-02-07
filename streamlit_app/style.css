@@ -3,6 +3,22 @@ body {
     background-color: #27313f;
 }
 
+/* RÉGLAGES LAYOUT DESKTOP (PAYSAGE) */
+section.main > div {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    max-width: 1200px;
+}
+
+div[data-testid="stVerticalBlock"] > div {
+    gap: 0.5rem;
+}
+
 /* HERO SECTION */
 .hero { 
     background-size: cover;
@@ -48,3 +64,8 @@ body {
     margin-top: 40px;
     font-size: 14px;
 }
+
+/* Cartouche */
+/* Fichier : streamlit_app/style.css */
+/* Rôle : styles de l'interface Streamlit */
+/* Date : 2026-02-07 */
