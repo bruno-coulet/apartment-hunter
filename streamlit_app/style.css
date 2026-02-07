@@ -4,14 +4,27 @@ body {
 }
 
 h1{
-    font-size: 1.25rem;
+    font-size: 0.7rem;
 }
 
-.st-emotion-cache-zy6yx3 {
-    width: 100%;
-    padding: 2rem 1rem 2rem;
-    max-width: initial;
-    min-width: auto;
+/* Layout colonnes : ajouter un espacement horizontal stable */
+div[data-testid="stHorizontalBlock"] {
+    gap: 1.25rem;
+}
+
+div[data-testid="stHorizontalBlock"] > div {
+    gap: 1.25rem;
+}
+
+div[data-testid="column"]:not(:last-child) {
+    margin-right: 1.25rem;
+}
+
+/* Colonnes du formulaire : padding interne + bordure légère */
+div[data-testid="column"] > div {
+    padding: 0.75rem 0.75rem 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
 }
 
 /* HERO SECTION */

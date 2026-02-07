@@ -108,7 +108,7 @@ load_css()
 # --- INTERFACE UTILISATEUR ---
 st.title("🏙️ Madrid Apartment Hunter")
 st.markdown("""
-    Estimation du prix d'achat d'un appartement à Madrid basée sur le **Machine Learning**.
+    Estimation du prix d'achat d'un appartement à Madrid.
 """)
 
 
@@ -122,8 +122,12 @@ neighborhood_mapping = load_neighborhood_mapping()
 with st.form("prediction_form"):
     st.subheader("📋 Caractéristiques du bien")
     
-    # répartition horizontale des 3 colonnes
-    col_left, col_mid, col_right = st.columns([1, 1, 1])
+    # Répartition horizontale des 3 colonnes avec espacement réel
+    col_left, spacer_1, col_mid, spacer_2, col_right = st.columns([1, 0.08, 1, 0.08, 1])
+    with spacer_1:
+        st.write("")
+    with spacer_2:
+        st.write("")
     
     numeric_features = config.get("numeric_features", [])
     ranges = config.get("ranges", {})
