@@ -83,7 +83,8 @@ with st.form("prediction_form"):
             min_value=int(feature_range.get("min", 10)),
             max_value=int(feature_range.get("max", 1000)),
             value=int(feature_range.get("mean", 75)),
-            step=1
+            step=1,
+            format="%d"
         )
         
         feature_range = ranges.get("n_rooms", {})
@@ -101,7 +102,8 @@ with st.form("prediction_form"):
             min_value=int(feature_range.get("min", 1)),
             max_value=int(feature_range.get("max", 10)),
             value=int(feature_range.get("mean", 1)),
-            step=1
+            step=1,
+            format="%d"
         )
     
     with col2:
@@ -125,7 +127,7 @@ with st.form("prediction_form"):
 # --- LOGIQUE DE PRÉDICTION ---
 if submit_button:
     payload = {
-        "sq_mt_built": float(sq_mt_built),
+        "sq_mt_built": int(sq_mt_built),
         "n_rooms": int(n_rooms),
         "n_bathrooms": int(n_bathrooms),
         "neighborhood": int(neighborhood),

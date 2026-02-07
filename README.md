@@ -1,31 +1,34 @@
 # apartment-hunter
 
-**Outil de prédiction de prix immobilier** basé sur FastAPI, Streamlit et Docker.
+Outil de prédiction de prix immobilier (Madrid) basé sur FastAPI, Streamlit, scikit‑learn et Docker.
 
 ---
 
 ## 📋 Vue d'ensemble
 
-Ce projet estime les prix immobiliers à Madrid en utilisant des modèles d'apprentissage automatique entraînés sur des données immobilières. Il expose une **API FastAPI** pour les prédictions et une **interface Streamlit** pour l'UX.
+Le projet expose:
+- une API FastAPI pour la prédiction,
+- une UI Streamlit pour saisir les caractéristiques et afficher le prix estimé.
+
+Le modèle actuel utilise 10 variables et prédit le log‑prix pendant l'entraînement, puis retourne le prix en euros côté API.
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │         Streamlit UI (Port 8501)                    │
-│    - Formulaire d'entrée utilisateur                │
-│    - Affichage résultats                            │
+│  - Formulaire et affichage                          │
 └──────────────┬──────────────────────────────────────┘
-               │ HTTP Requests
+               │ HTTP
                ↓
 ┌─────────────────────────────────────────────────────┐
-│         FastAPI Server (Port 8000)                  │
-│    - POST /predict - Prédictions                    │
-│    - GET / - Santé de l'API                         │
+│            FastAPI (Port 8000)                      │
+│  - GET /           (santé)                          │
+│  - POST /predict  (prédiction)                      │
 └──────────────┬──────────────────────────────────────┘
                │
                ↓
-      ML Model + Preprocessing
+        Préprocesseur + Modèle (pickle)
 ```
 
 ---
@@ -34,107 +37,89 @@ Ce projet estime les prix immobiliers à Madrid en utilisant des modèles d'appr
 
 ```
 apartment-hunter/
-├── api.py                  # API FastAPI
+├── api.py
 ├── streamlit_app/
-│   ├── app.py             # Interface Streamlit
-│   └── style.css          # Styling CSS
-├── cleaning_utils.py      # Utilitaires de nettoyage
-├── data_cleaned/          # Données nettoyées
-├── data_model/            # Train/Test split
-├── models/                # Modèles sauvegardés
-├── raw_data/              # Données brutes
-├── requirements.txt       # Dépendances Python
-├── pyproject.toml         # Config uv + projet
-├── Dockerfile             # Build Docker
-├── docker-compose.yml     # Orchestration (optionnel)
-└── README.md             # Documentation
-```
-
-### Notebooks (Développement)
-
-- **1_cleaning.ipynb** - Import et nettoyage des données
-- **2_analysis.ipynb** - Analyse exploratoire et sélection de variables
-- **3_model.ipynb** - Entraînement et validation du modèle
-
----
-
-## 🚀 Installation
-
-### Avec `uv` (recommandé)
-
-```bash
-# Installer uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Créer environnement virtuel
-uv venv
-
-# Installer dépendances
-uv pip install -r requirements.txt
-```
-
-### Avec pip classique
-
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou
-venv\Scripts\activate  # Windows
-
-pip install -r requirements.txt
+│   ├── app.py
+│   └── style.css
+├── 1_cleaning.ipynb
+├── 2_analysis.ipynb
+├── 3_model.ipynb
+├── cleaning_utils.py
+├── data_cleaned/
+├── data_model/
+├── models/
+│   ├── ridge_model.pkl
+│   ├── preprocessor.pkl
+│   ├── model_config.json         # colonnes du modèle (10), use_log, etc.
+│   └── streamlit_config.json     # colonnes UI, ranges et catégories
+├── raw_data/
+├── pyproject.toml                 # gestion via uv
+├── Dockerfile
+├── Dockerfile.streamlit
+├── docker-compose.yml
+└── README.md
 ```
 
 ---
 
-## 🐳 Docker
+## 🚀 Lancer avec Docker Compose (recommandé)
 
-### Build l'image
-
+1. Lancer l'application Docker Desktop
+2. Sur un terminal, lancer la commande :
 ```bash
-docker build -t apartment-api .
+docker compose up -d --build
 ```
 
-### Lancer l'API seule
+Accès:
+- Streamlit: http://localhost:8501
+- API (docs): http://localhost:8000/docs
 
+Commandes utiles:
 ```bash
-docker run -p 8000:8000 apartment-api
-# L'API est disponible à http://localhost:8000
+# redemarrer les service
+docker compose restart api streamlit
+docker compose logs -f api
+docker compose logs -f streamlit
+docker compose down
 ```
-
-### Lancer avec Docker Compose (API + Streamlit)
-
-```bash
-docker-compose up
-```
-
-Puis accédez à:
-- **Streamlit**: http://localhost:8501
-- **FastAPI Docs**: http://localhost:8000/docs
 
 ---
 
-## 🔧 Utilisation
+## 🔧 API
 
-### API FastAPI
-
-**GET /** - Vérifier la santé
-
+### Santé
 ```bash
 curl http://localhost:8000/
 ```
 
-**POST /predict** - Prédire un prix
+### Prédire un prix
+Entrée attendue (10 features):
+```json
+{
+  "sq_mt_built": 100.0,
+  "n_rooms": 3,
+  "n_bathrooms": 2,
+  "neighborhood": 77,
+  "has_lift": 1,
+  "has_parking": 0,
+  "has_pool": 0,
+  "has_garden": 0,
+  "has_storage_room": 0,
+  "is_floor_under": 0
+}
+```
 
+Exemple:
 ```bash
 curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
   -d '{
-    "sq_mt_built": 100,
+    "sq_mt_built": 100.0,
     "n_rooms": 3,
     "n_bathrooms": 2,
-    "neighborhood": 50,
+    "neighborhood": 77,
     "has_lift": 1,
-    "has_parking": 1,
+    "has_parking": 0,
     "has_pool": 0,
     "has_garden": 0,
     "has_storage_room": 0,
@@ -142,46 +127,62 @@ curl -X POST http://localhost:8000/predict \
   }'
 ```
 
-### Interface Streamlit
-
-```bash
-streamlit run streamlit_app/app.py
+Réponse:
+```json
+{
+  "prediction": 579857.56,   // euros (déjà dé-log)
+  "prediction_log": 13.2705, // informatif
+  "status": "success"
+}
 ```
 
-Accès: http://localhost:8501
+Notes:
+- `neighborhood` est transmis en entier côté UI; l'API le convertit en chaîne pour le OneHotEncoder.
+- En cas d'erreur 422, vérifier que les 10 champs sont fournis avec les bons types.
 
 ---
 
-## 📦 Gestion des dépendances
+## 🖥️ UI Streamlit
 
-Garder `requirements.txt` à jour avec `uv`:
+L'UI consomme `models/streamlit_config.json` pour:
+- la liste des colonnes d'entrée,
+- les plages `ranges` pour les numériques,
+- les valeurs catégorielles (`neighborhood`).
 
+Affichage:
+- `n_bathrooms` est un entier,
+- le prix est formaté à la française (ex: `389.788,00 €`).
+
+Lancer localement (hors Docker):
 ```bash
-uv export --format requirements-txt --no-dev -o requirements.txt
+uv run streamlit run streamlit_app/app.py
 ```
 
+---
 
-Pour garder le fichier requirements.txt reflète toujours la réalité (par exemple si les collègues n'utilisent pas encore uv), on peut faut le régénérer avec la commande :
+## 🧠 Modèle & artefacts
 
-```shell
-uv export --format requirements-txt --no-dev -o requirements.txt
+Le notebook [3_model.ipynb](3_model.ipynb) entraîne un pipeline scikit‑learn:
+- Prétraitement: `SimpleImputer` + `StandardScaler` (numériques) et `OneHotEncoder` (catégorie `neighborhood`, drop='first'),
+- Modèle: `Ridge` entraîné sur `log(buy_price)`.
+
+Artefacts sauvegardés dans `models/`:
+- `ridge_model.pkl`, `preprocessor.pkl`,
+- `model_config.json` (colonnes du modèle, `use_log`),
+- `streamlit_config.json` (colonnes UI, ranges, valeurs catégorielles).
+
+Après ré‑export, redémarrer les services pour la prise en compte:
+ 
+docker compose restart api streamlit
 ```
 
-Arrêter l'ancien conteneur (pour libérer le port 8000) :
-```shell
-docker stop $(docker ps -q --filter "ancestor=apartment-api")
-```
+---
 
+## 🛠️ Dépannage
 
-Créer l'image Docker
-```shell
-docker build -t apartment-api .
-```
-
-### Run l'image Docker
-```shell
-docker run -p 8000:8000 apartment-api
-```
+- 422 sur /predict: vérifier les 10 champs et types; relancer `docker compose restart api`.
+- Valeurs `inf`/`nan`: vérifier que l'UI n'applique pas `exp()` côté client; l'API renvoie déjà des euros.
+- Catégories inconnues: `neighborhood` doit correspondre aux valeurs de `streamlit_config.json` (l'API convertit en chaîne pour le OneHotEncoder).
 
 ---
 

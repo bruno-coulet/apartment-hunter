@@ -1,3 +1,9 @@
+"""API FastAPI pour la prédiction de prix immobilier.
+
+Expose une route de santé et une route de prédiction s'appuyant sur
+un modèle scikit-learn et son préprocesseur.
+"""
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 import joblib
@@ -21,6 +27,7 @@ config = None
 
 # --- FONCTION DE CHARGEMENT ---
 def load_assets():
+    """Charge la configuration, le modèle et le préprocesseur en mémoire."""
     global model, preprocessor, config
     try:
         # 1. Chargement de la configuration JSON
@@ -63,9 +70,9 @@ load_assets()
 
 # --- SCHÉMA DE DONNÉES (Pydantic) ---
 class PropertyData(BaseModel):
-    sq_mt_built: float
+    sq_mt_built: int
     n_rooms: int
-    n_bathrooms: float
+    n_bathrooms: int
     neighborhood: int
     has_lift: int = 0
     has_parking: int = 0
@@ -78,6 +85,7 @@ class PropertyData(BaseModel):
 
 @app.get("/")
 def home():
+    """Retourne l'état de santé de l'API."""
     return {
         "status": "API is running",
         "model_loaded": model is not None,
@@ -86,6 +94,7 @@ def home():
 
 @app.post("/predict")
 def predict(data: PropertyData):
+    """Génère une prédiction de prix à partir des caractéristiques reçues."""
     try:
         # 1. Préparation des données
         input_dict = data.model_dump()
@@ -93,9 +102,10 @@ def predict(data: PropertyData):
         
         print(f"\n📥 Input reçu: {input_dict}")
         
-        # 1b. Convertir neighborhood en STRING (c'est une catégorie)
-        df_input["neighborhood"] = df_input["neighborhood"].astype(str)
-        print(f"   neighborhood converti en string: {df_input['neighborhood'].iloc[0]}")
+        # 1b. Conserver le type utilisé à l'entraînement (texte)
+        #    Évite un décalage de catégories dans le OneHotEncoder
+        df_input["neighborhood"] = df_input["neighborhood"].astype("string")
+        print(f"   neighborhood (dtype str): {df_input['neighborhood'].iloc[0]}")
         
         # 2. Sélectionner les 10 colonnes dans le bon ordre
         useful_features = [
@@ -125,8 +135,8 @@ def predict(data: PropertyData):
             print(f"❌ Prédiction LOG invalide: {prediction_log}")
             return {"error": f"Prédiction invalide: {prediction_log}"}
         
-        # 6. Conversion inverse (LOG -> EUROS)
-        prediction_euros = np.exp(prediction_log)
+        # 6. Conversion inverse (LOG1P -> EUROS)
+        prediction_euros = np.expm1(prediction_log)
         
         print(f"💰 Prédiction EUROS: {prediction_euros:.2f}")
         
@@ -146,3 +156,8 @@ def predict(data: PropertyData):
         import traceback
         traceback.print_exc()
         return {"error": str(e)}
+
+    # --- Cartouche ---
+    # Fichier : api.py
+    # Rôle : API de prédiction (FastAPI)
+    # Date : 2026-02-07
