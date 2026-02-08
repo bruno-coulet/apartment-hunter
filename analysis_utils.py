@@ -92,7 +92,41 @@ def plot_numeric_histograms(
     for i, col in enumerate(num_cols, 1):
         plt.subplot(n_rows, n_cols, i)
         sns.histplot(X[col].dropna(), bins=bins)
+        plt.xlabel("")   # masque axe X
+        plt.ylabel("")   # masque axe Y
+        plt.grid(True, alpha=0.3)
         plt.title(col)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_missing_bar(
+    X: pd.DataFrame,
+    top_n: Optional[int] = None,
+    figsize: Tuple[int, int] = (8, 4),
+) -> None:
+    """
+    Affiche un bar plot du % de valeurs manquantes par colonne.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Données d'entrée.
+    top_n : int | None
+        Affiche uniquement les top_n colonnes les plus manquantes.
+    figsize : tuple
+        Taille de la figure.
+    """
+    missing_pct = (X.isna().mean() * 100).sort_values(ascending=False)
+    if top_n is not None:
+        missing_pct = missing_pct.head(top_n)
+
+    plt.figure(figsize=figsize)
+    sns.barplot(x=missing_pct.values, y=missing_pct.index, color="#439cc8")
+    plt.xlabel("% de valeurs manquantes")
+    plt.ylabel("Colonnes")
+    plt.title("Taux de valeurs manquantes par colonne")
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
 
