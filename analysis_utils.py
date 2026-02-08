@@ -99,6 +99,52 @@ def plot_numeric_histograms(
     plt.tight_layout()
     plt.show()
 
+def plot_qualitative(
+    X: pd.DataFrame,
+    top_n: int = 20,
+    n_cols: int = 2,
+    figsize_per_col: Tuple[int, int] = (6, 4),
+    figsize: Optional[Tuple[int, int]] = None,
+    height_per_row: int = 4,
+) -> None:
+    """
+    Affiche des barplots pour les colonnes qualitatives.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Données d'entrée.
+    top_n : int
+        Nombre de modalités affichées par colonne.
+    n_cols : int
+        Nombre de graphes par ligne.
+    figsize_per_col : tuple
+        Taille d'un subplot (largeur, hauteur).
+    """
+    cat_cols = X.select_dtypes(include=["object", "category", "string", "bool"]).columns
+    n_plots = len(cat_cols)
+    if n_plots == 0:
+        return
+
+    n_rows = math.ceil(n_plots / n_cols)
+    if figsize is None:
+        figsize = (n_cols * figsize_per_col[0], n_rows * height_per_row)
+
+    plt.figure(figsize=figsize)
+    
+
+    for i, col in enumerate(cat_cols, 1):
+        plt.subplot(n_rows, n_cols, i)
+        vc = X[col].astype("string").value_counts(dropna=False).head(top_n)
+        sns.barplot(x=vc.values, y=vc.index, color="#439cc8")
+        plt.xlabel("")
+        plt.ylabel("")
+        plt.title(col)
+        plt.grid(True, axis="x", alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
 
 def plot_missing_bar(
     X: pd.DataFrame,
