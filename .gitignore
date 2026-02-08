@@ -5,6 +5,7 @@ data_model/
 img/
 models/
 .DS_Store
+img/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

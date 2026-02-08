@@ -144,6 +144,10 @@ def impute_categorical(df: pd.DataFrame, cols: list = None, fill_value: str = 'm
 
 # --- Taux de remplissage ---
 def fill_rate(df):
+    """
+    Calcule le taux de remplissage (%) par colonne : 100 * (nb de valeurs non nulles / nb total de lignes).
+    Retourne une Series indexée par nom de colonne.
+    """
     return df.count() / len(df) * 100
 
 # --- Suppression de colonnes ---

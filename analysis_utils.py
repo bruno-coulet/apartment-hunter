@@ -148,6 +148,7 @@ def plot_scatter_vs_target(
 
 def plot_corr_heatmap(
     df: pd.DataFrame,
+    method: str = "pearson",
     title: str = "Heatmap des corrélations",
     figsize: Tuple[int, int] = (12, 10),
     annot: bool = True,
@@ -176,7 +177,7 @@ def plot_corr_heatmap(
     cmap : str
         Palette de couleurs.
     """
-    corr = df.select_dtypes(include=[np.number]).corr()
+    corr = df.select_dtypes(include=[np.number]).corr(method=method)
     plt.figure(figsize=figsize)
     sns.heatmap(corr, annot=annot, fmt=fmt, vmin=vmin, vmax=vmax, cmap=cmap)
     plt.title(title)
