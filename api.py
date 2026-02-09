@@ -102,10 +102,10 @@ def predict(data: PropertyData):
         
         print(f"\n📥 Input reçu: {input_dict}")
         
-        # 1b. Conserver le type utilisé à l'entraînement (texte)
-        #    Évite un décalage de catégories dans le OneHotEncoder
-        df_input["neighborhood"] = df_input["neighborhood"].astype("string")
-        print(f"   neighborhood (dtype str): {df_input['neighborhood'].iloc[0]}")
+        # 1b. Conserver le type utilisé à l'entraînement (entier)
+        #    Les catégories du OneHotEncoder sont des entiers
+        df_input["neighborhood"] = df_input["neighborhood"].astype("int")
+        print(f"   neighborhood (dtype int): {df_input['neighborhood'].iloc[0]}")
         
         # 2. Sélectionner les 10 colonnes dans le bon ordre
         useful_features = [

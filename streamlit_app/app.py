@@ -208,12 +208,17 @@ if submit_button:
                 result = response.json()
                 
                 if "prediction" in result:
-                    prix_euros = result["prediction"]
+                    prix_euros = result["prediction"]  # Déjà converti de log1p par l'API
                     with estimation_placeholder.container():
                         st.success("✅ Estimation\ntérminée!")
-                        st.metric(label="💰 Prix", value=format_euros(prix_euros))
+                        st.metric(label="💰 Prix estimé", value=format_euros(prix_euros))
+                        
+                        # Afficher le nom du quartier
+                        quartier_nom = neighborhood_mapping.get(neighborhood, f"Quartier {neighborhood}")
+                        st.caption(f"📍 {quartier_nom}")
+                        
                         if "prediction_log" in result:
-                            st.caption(f"(log: {result['prediction_log']:.4f})")
+                            st.caption(f"(valeur en log1p: {result['prediction_log']:.4f})")
                     
                 elif "error" in result:
                     st.error(f"❌ Erreur API: {result['error']}")
