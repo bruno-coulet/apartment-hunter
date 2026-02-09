@@ -1,0 +1,48 @@
+# .dockerignore pour optimiser les builds Docker
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter notebooks (pas nécessaires en prod)
+notebook/
+*.ipynb
+*.ipynb_checkpoints
+
+# Data files (trop volumineux pour le container)
+data_model/*.csv
+data_model/*.feather
+
+# Documentation et développement
+docs/
+README.md
+*.md
+
+# Git et IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Tests
+tests/
+*_test.py
+
+# Fichiers temporaires
+*.tmp
+*.temp
+
+# OS
+.DS_Store
+Thumbs.db
