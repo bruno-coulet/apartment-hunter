@@ -4,6 +4,8 @@ import math
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Tuple, Optional, Any, List, Iterable
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
 def select_existing_features(features: Iterable[str], columns: Iterable[str]) -> List[str]:
@@ -463,3 +465,166 @@ def clean_data(
         )
 
     return X, stats
+
+
+def evaluate_model(
+        algo,
+        param_grid,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        search_type='grid',
+        scoring='r2',
+        cv=5):
+    """
+    Entraine un modele avec GridSearchCV ou RandomizedSearchCV et affiche les résultats
+    prédit les valeurs de test et calcule les métriques
+    
+    :parma algo: instance de l'algorithme à utiliser
+    :param param_grid: dictionnaire des paramètres à testerNone si vide)
+    :param X_train: features d'entrainement
+    :param y_train: target d'entrainement
+    :param X_test: features de test
+    :param y_test: target de test
+    :param search_type: type de recherche, 'grid' pour GridSearchCV, 'random' pour RandomizedSearchCV
+    :param scoring: métrique d'évaluation
+    :param cv: nombre de folds pour la validation croisée
+    :return: dict des meilleurs paramètres, R2, RMSE, MAE, les résultats et le modele
+    """
+    # Si la param grid est vide, entrainement sans optimisation
+    if param_grid is None:
+        algo.fit(X_train, y_train)
+        best_model = algo
+        best_params = algo.get_params()
+        cv_results = cross_val_score(best_model,
+                                      X_train, y_train,
+                                      cv=cv,
+                                      scoring=scoring)
+    else:
+        # Choisir le type de recherche d'hyperparamètres
+        if search_type == 'grid':
+            search = GridSearchCV(algo, 
+                                  param_grid, 
+                                  cv=cv, 
+                                  scoring=scoring)
+        elif search_type == 'random':
+            search = RandomizedSearchCV(algo, 
+                                        param_grid, 
+                                        cv=cv, 
+                                        scoring=scoring)
+        else:
+            raise ValueError("search_type doit être 'grid' ou 'random'")
+        
+        # Entrainement et optimisation
+        search.fit(X_train, y_train)
+        best_model = search.best_estimator_
+        best_params = search.best_params_
+        cv_results = search.cv_results_
+
+        # Prédiction avec le meilleur modele
+        y_pred = best_model.predict(X_test)
+
+        # Calcul des métriques
+        r2 = r2_score(y_test, y_pred)
+        rmse = mean_squared_error(y_test, y_pred) ** 0.5
+        mae = mean_absolute_error(y_test, y_pred)
+
+        # Affichage des résultats
+        print(f"Modèle : {algo.__class__.__name__}")
+        print(f"Meilleurs paramètres : {best_params}")
+        print(f"R2 (sur le test): {r2:.4f}")
+        print(f"RMSE : {rmse:.4f}")
+        print(f"MAE : {mae:.4f}")
+
+        return {
+            "best_params": best_params,
+            "r2": r2,
+            "rmse": rmse,
+            "mae": mae,
+            "cv_results": cv_results,
+            "best_model": best_model
+        }
+
+
+def eval_model_apart(
+        algo,
+        param_grid,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        search_type='grid',
+        scoring='r2',
+        cv=5):
+    """
+    Variante de evaluate_model qui corrige la transformation log1p
+    et affiche RMSE/MAE en euros.
+    """
+    # Si la param grid est vide, entrainement sans optimisation
+    if param_grid is None:
+        algo.fit(X_train, y_train)
+        best_model = algo
+        best_params = algo.get_params()
+        cv_results = cross_val_score(best_model,
+                                      X_train, y_train,
+                                      cv=cv,
+                                      scoring=scoring)
+        # Prédiction avec le meilleur modele
+        y_pred = best_model.predict(X_test)
+    else:
+        # Choisir le type de recherche d'hyperparamètres
+        if search_type == 'grid':
+            search = GridSearchCV(algo, 
+                                  param_grid, 
+                                  cv=cv, 
+                                  scoring=scoring)
+        elif search_type == 'random':
+            search = RandomizedSearchCV(algo, 
+                                        param_grid, 
+                                        cv=cv, 
+                                        scoring=scoring)
+        else:
+            raise ValueError("search_type doit être 'grid' ou 'random'")
+        
+        # Entrainement et optimisation
+        search.fit(X_train, y_train)
+        best_model = search.best_estimator_
+        best_params = search.best_params_
+        cv_results = search.cv_results_
+
+        # Prédiction avec le meilleur modele
+        y_pred = best_model.predict(X_test)
+
+    # Calcul des métriques (y en log1p -> conversion en euros)
+    r2 = r2_score(y_test, y_pred)
+    max_log = np.log(np.finfo(np.float64).max)
+    y_test_safe = np.nan_to_num(np.asarray(y_test, dtype=float), nan=0.0, posinf=max_log, neginf=-max_log)
+    y_pred_safe = np.nan_to_num(np.asarray(y_pred, dtype=float), nan=0.0, posinf=max_log, neginf=-max_log)
+    y_test_safe = np.clip(y_test_safe, a_min=None, a_max=max_log)
+    y_pred_safe = np.clip(y_pred_safe, a_min=None, a_max=max_log)
+    y_test_eur = np.expm1(y_test_safe)
+    y_pred_eur = np.expm1(y_pred_safe)
+    rmse = mean_squared_error(y_test_eur, y_pred_eur) ** 0.5
+    mae = mean_absolute_error(y_test_eur, y_pred_eur)
+    # Conversion en k€ pour la lisibilité
+    rmse_k = rmse / 1000.0
+    mae_k = mae / 1000.0
+
+    # Affichage des résultats
+    print(f"Modèle : {algo.__class__.__name__}")
+    print(f"Meilleurs paramètres : {best_params}")
+    print(f"R2 (sur le test, log): {r2:.4f}")
+    print(f"RMSE : {rmse:.2f}€")
+    print(f"MAE : {mae:.2f} €")
+    print(f"RMSE : {rmse_k:.2f} k€")
+    print(f"MAE  : {mae_k:.2f} k€")
+
+    return {
+        "best_params": best_params,
+        "r2": r2,
+        "rmse": rmse,
+        "mae": mae,
+        "cv_results": cv_results,
+        "best_model": best_model
+    }
