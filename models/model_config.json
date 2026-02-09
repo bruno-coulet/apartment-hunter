@@ -1,0 +1,27 @@
+{
+  "input_columns": [
+    "sq_mt_built",
+    "n_rooms", 
+    "n_bathrooms",
+    "neighborhood",
+    "has_lift",
+    "has_parking",
+    "has_pool",
+    "has_garden",
+    "has_storage_room",
+    "is_floor_under"
+  ],
+  "model_type": "Ridge",
+  "preprocessing_info": {
+    "numeric_features": ["sq_mt_built", "n_rooms", "n_bathrooms"],
+    "categorical_features": ["neighborhood"],
+    "binary_features": [
+      "has_lift",
+      "has_parking", 
+      "has_pool",
+      "has_garden",
+      "has_storage_room",
+      "is_floor_under"
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import Optional
 import pandas as pd
 import numpy as np
 
@@ -12,45 +13,53 @@ from pathlib import Path
 app = FastAPI()
 
 # --------- CHARGEMENT DES MODÈLES ----------
-# --------- CHARGEMENT DES MODÈLES ----------
 MODEL_DIR = Path("models")
 
-# Pour l'instant, utiliser le modèle existant pour les deux types
+# Chargement des modèles spécialisés
 try:
-    with open(MODEL_DIR / "best_model.pkl", "rb") as f:
-        base_model = pickle.load(f)
+    # Modèle appartements RandomForest
+    with open(MODEL_DIR / "model_appartements.pkl", "rb") as f:
+        apt_data = pickle.load(f)
     
-    with open(MODEL_DIR / "preprocessor.pkl", "rb") as f:
-        base_preprocessor = pickle.load(f)
+    # Modèle maisons RandomForest
+    with open(MODEL_DIR / "model_maisons.pkl", "rb") as f:
+        mai_data = pickle.load(f)
     
-    with open(MODEL_DIR / "model_metadata.pkl", "rb") as f:
-        base_metadata = pickle.load(f)
-    
-    # Utiliser le même modèle pour les deux types pour l'instant
     models = {
         'appartements': {
-            'model': base_model,
-            'preprocessor': base_preprocessor,  
-            'metadata': base_metadata
+            'model': apt_data['model'],
+            'scaler': apt_data.get('scaler'),
+            'features': apt_data['features'],
+            'metadata': apt_data.get('metadata', {
+                'model_name': 'RandomForest',
+                'performance_r2': 0.7474,
+                'property_type': 'appartements'
+            })
         },
         'maisons': {
-            'model': base_model,
-            'preprocessor': base_preprocessor,
-            'metadata': base_metadata
+            'model': mai_data['model'],
+            'scaler': mai_data.get('scaler'),
+            'features': mai_data['features'],
+            'metadata': mai_data.get('metadata', {
+                'model_name': 'RandomForest',
+                'performance_r2': 0.7965,
+                'property_type': 'maisons'
+            })
         }
     }
     
-    print(f"✅ Modèles chargés pour appartements et maisons")
-    print(f"✅ Performance: {base_metadata.get('test_score', 0):.4f} R²")
+    print(f"Modèles chargés:")
+    print(f"  Appartements: {models['appartements']['metadata']['model_name']} (R² = {models['appartements']['metadata']['performance_r2']:.4f})")
+    print(f"  Maisons: {models['maisons']['metadata']['model_name']} (R² = {models['maisons']['metadata']['performance_r2']:.4f})")
     
 except FileNotFoundError as e:
-    print(f"❌ Erreur: Fichier modèle non trouvé: {e}")
+    print(f"Erreur: Fichier modèle non trouvé: {e}")
     models = {'appartements': None, 'maisons': None}
 
 # --------- INPUT SCHEMAS SPÉCIFIQUES PAR TYPE ----------
 class AppartementInput(BaseModel):
     """Schema pour les appartements"""
-    property_type: str = "appartements"  # Type de bien
+    property_type: str = "appartements"
     sq_mt_built: float
     n_rooms: int
     n_bathrooms: float
@@ -59,14 +68,19 @@ class AppartementInput(BaseModel):
     has_central_heating: int = 0
 
 class MaisonInput(BaseModel):
-    """Schema pour les maisons"""  
-    property_type: str = "maisons"  # Type de bien
+    """Schema pour les maisons"""
+    property_type: str = "maisons"
     sq_mt_built: float
     n_rooms: int
     n_bathrooms: float
     has_garden: int = 0
     has_pool: int = 0
-    neighborhood: str = "Unknown"  # Ajouté pour les maisons si nécessaire
+    neighborhood: int = 0
+    # Colonnes dupliquées du dataset original
+    n_bathrooms_1: Optional[float] = None  # sera automatiquement dupliqué
+    has_pool_1: Optional[int] = None  # sera automatiquement dupliqué
+
+
 
 
 @app.get("/")
@@ -109,10 +123,10 @@ def preprocess_input(payload, property_type: str) -> pd.DataFrame:
         
         # Réorganiser dans l'ordre exact du training
         df = df[metadata['features']]
-        print(f"✅ Colonnes réorganisées pour {property_type}: {list(df.columns)}")
+        print(f"Colonnes réorganisées pour {property_type}: {list(df.columns)}")
     
-    print(f"✅ DataFrame final pour {property_type}: colonnes = {list(df.columns)}")
-    print(f"✅ Types: {dict(df.dtypes)}")
+    print(f"DataFrame final pour {property_type}: colonnes = {list(df.columns)}")
+    print(f"Types: {dict(df.dtypes)}")
     
     return df
 
@@ -122,11 +136,13 @@ def predict_appartement(data: AppartementInput):
     """Prédiction de prix pour un appartement"""
     return make_prediction(data, "appartements")
 
-
-@app.post("/predict/maisons") 
+@app.post("/predict/maisons")
 def predict_maison(data: MaisonInput):
     """Prédiction de prix pour une maison"""
     return make_prediction(data, "maisons")
+
+
+
 
 
 def make_prediction(data, property_type: str):
@@ -137,47 +153,61 @@ def make_prediction(data, property_type: str):
     
     model_data = models[property_type]
     model = model_data['model']
-    preprocessor = model_data['preprocessor']
+    scaler = model_data.get('scaler')
+    features = model_data['features']
     metadata = model_data['metadata']
     
     try:
         print(f"📥 Requête {property_type} reçue: {data}")
         
-        # 1. Preprocessing des données d'entrée
-        df_input = preprocess_input(data, property_type)
-        print(f"✅ DataFrame créé: {df_input}")
+        # 1. Conversion en dictionnaire et extraction des features
+        input_dict = data.dict()
+        input_dict.pop('property_type', None)  # Retirer le type
         
-        # 2. Appliquer le preprocesseur si nécessaire
-        if preprocessor is not None:
-            X_processed = preprocessor.transform(df_input)
-            print(f"✅ Transformation appliquée: {X_processed.shape}")
+        # 2. Créer DataFrame avec les bonnes features
+        df_input = pd.DataFrame([input_dict])
+        
+        # Pour les maisons, adapter aux features exactes du modèle entraîné
+        if property_type == "maisons":
+            # Ajouter les colonnes manquantes avec les valeurs correspondantes
+            if 'n_bathrooms.1' not in df_input.columns:
+                df_input['n_bathrooms.1'] = df_input['n_bathrooms']
+            if 'has_pool.1' not in df_input.columns:
+                df_input['has_pool.1'] = df_input['has_pool']
+        
+        df_input = df_input[features]  # Réorganiser selon les features du modèle
+        
+        print(f"Features extraites: {list(df_input.columns)}")
+        print(f"Valeurs: {df_input.iloc[0].to_dict()}")
+        
+        # 3. Preprocessing si nécessaire
+        if scaler is not None:
+            X_processed = scaler.transform(df_input)
+            print(f"Scaling appliqué")
         else:
             X_processed = df_input.values
+            print(f"Pas de scaling (RandomForest)")
             
-        # 3. Prédiction
-        prediction = model.predict(X_processed)[0] if hasattr(X_processed, 'shape') and len(X_processed.shape) > 1 else model.predict(df_input)[0]
-        print(f"✅ Prédiction {property_type}: {prediction}")
+        # 4. Prédiction
+        prediction = model.predict(X_processed)[0]
+        print(f"Prédiction {property_type}: {prediction}")
         
-        # 4. Conversion si nécessaire (prix réel vs log-prix)
-        # Assumons que le modèle retourne déjà le prix réel
-        price_pred = float(prediction)
-        
+        # 5. Résultat
         result = {
-            "prediction": int(price_pred),
+            "prediction": int(prediction),
             "property_type": property_type,
             "model_used": metadata.get("model_name", "Unknown"),
-            "preprocessing_applied": preprocessor is not None,
-            "features_count": len(metadata.get('features', [])),
-            "input_data": data.dict(),
-            "r2_score": metadata.get("test_score", 0.0)
+            "features_used": features,
+            "r2_score": metadata.get("test_score", 0.0),
+            "input_data": input_dict
         }
         
-        print(f"📤 Réponse {property_type} envoyée: {result}")
+        print(f"📤 Réponse {property_type} envoyée: prix = {int(prediction)}€")
         return result
 
     except Exception as e:
         error_msg = f"Erreur lors de la prédiction {property_type}: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         import traceback
         traceback.print_exc()
         return {"error": error_msg}
