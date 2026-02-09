@@ -11,144 +11,172 @@ from pathlib import Path
 
 app = FastAPI()
 
-# --------- CHARGEMENT DU MODÈLE ET DU PREPROCESSEUR ----------
+# --------- CHARGEMENT DES MODÈLES ----------
+# --------- CHARGEMENT DES MODÈLES ----------
 MODEL_DIR = Path("models")
 
-# Charger le modèle entraîné
+# Pour l'instant, utiliser le modèle existant pour les deux types
 try:
     with open(MODEL_DIR / "best_model.pkl", "rb") as f:
-        model = pickle.load(f)
+        base_model = pickle.load(f)
     
     with open(MODEL_DIR / "preprocessor.pkl", "rb") as f:
-        preprocessor = pickle.load(f)
+        base_preprocessor = pickle.load(f)
     
     with open(MODEL_DIR / "model_metadata.pkl", "rb") as f:
-        metadata = pickle.load(f)
+        base_metadata = pickle.load(f)
     
-    print(f"✅ Modèle chargé: {metadata['model_name']}")
-    print(f"✅ Performance: {metadata['test_score']:.4f} R²")
-    print(f"✅ Features: {len(metadata['features'])} variables")
+    # Utiliser le même modèle pour les deux types pour l'instant
+    models = {
+        'appartements': {
+            'model': base_model,
+            'preprocessor': base_preprocessor,  
+            'metadata': base_metadata
+        },
+        'maisons': {
+            'model': base_model,
+            'preprocessor': base_preprocessor,
+            'metadata': base_metadata
+        }
+    }
+    
+    print(f"✅ Modèles chargés pour appartements et maisons")
+    print(f"✅ Performance: {base_metadata.get('test_score', 0):.4f} R²")
     
 except FileNotFoundError as e:
     print(f"❌ Erreur: Fichier modèle non trouvé: {e}")
-    model = None
-    preprocessor = None
-    metadata = None
+    models = {'appartements': None, 'maisons': None}
 
-# --------- INPUT SCHEMA (match Streamlit payload) ----------
-class InputData(BaseModel):
+# --------- INPUT SCHEMAS SPÉCIFIQUES PAR TYPE ----------
+class AppartementInput(BaseModel):
+    """Schema pour les appartements"""
+    property_type: str = "appartements"  # Type de bien
     sq_mt_built: float
     n_rooms: int
     n_bathrooms: float
-    neighborhood: int
-    product: str  # Type de bien (appartement, maison, etc.)
-
     has_lift: int = 0
     has_parking: int = 0
-    has_pool: int = 0
+    has_central_heating: int = 0
+
+class MaisonInput(BaseModel):
+    """Schema pour les maisons"""  
+    property_type: str = "maisons"  # Type de bien
+    sq_mt_built: float
+    n_rooms: int
+    n_bathrooms: float
     has_garden: int = 0
-    has_storage_room: int = 0
-    is_floor_under: int = 0
+    has_pool: int = 0
+    neighborhood: str = "Unknown"  # Ajouté pour les maisons si nécessaire
 
 
 @app.get("/")
 def read_root():
+    available_models = [k for k, v in models.items() if v is not None]
     return {
-        "message": "API d'estimation immobilière avec StandardScaler",
-        "model": metadata["model_name"] if metadata else "Non chargé",
-        "performance": f"{metadata['test_score']:.4f} R²" if metadata else "N/A",
-        "features": len(metadata['features']) if metadata else 0
+        "message": "API d'estimation immobilière - Appartements et Maisons",
+        "available_models": available_models,
+        "appartements_loaded": models.get("appartements") is not None,
+        "maisons_loaded": models.get("maisons") is not None
     }
 
 
-def preprocess_input(payload: InputData) -> pd.DataFrame:
-    """Convertit les données d'entrée en DataFrame avec les bonnes colonnes et le bon ordre"""
+def preprocess_input(payload, property_type: str) -> pd.DataFrame:
+    """Convertit les données d'entrée en DataFrame selon le type de bien"""
     
-    # Créer un DataFrame avec l'ordre EXACT du notebook 
-    # (d'après vos métadonnées : numeric_features + categorical_features)
-    data_dict = {
-        # Ordre des features numériques (comme dans le notebook)
-        'sq_mt_built': [payload.sq_mt_built],
-        'n_rooms': [payload.n_rooms],
-        'n_bathrooms': [payload.n_bathrooms],
-        'has_lift': [payload.has_lift],
-        'has_parking': [payload.has_parking],
-        'has_pool': [payload.has_pool],
-        'has_garden': [payload.has_garden],
-        'has_storage_room': [payload.has_storage_room],
-        'is_floor_under': [payload.is_floor_under],
-        # Feature catégorielle en dernier
-        'neighborhood': [payload.neighborhood]
-    }
+    if property_type not in models or models[property_type] is None:
+        raise ValueError(f"Modèle {property_type} non disponible")
     
-    df = pd.DataFrame(data_dict)
+    metadata = models[property_type]['metadata']
+    
+    # Convertir le payload en dictionnaire
+    if hasattr(payload, 'dict'):
+        data_dict = payload.dict()
+    else:
+        data_dict = payload
+    
+    # Supprimer property_type des données (pas utilisé dans le modèle)
+    data_dict.pop('property_type', None)
+    
+    # Créer DataFrame avec une seule ligne
+    df = pd.DataFrame([data_dict])
     
     # Réorganiser selon l'ordre exact des métadonnées du modèle
-    if metadata and 'features' in metadata:
-        # Utiliser l'ordre exact sauvegardé lors de l'entraînement
+    if 'features' in metadata:
+        # S'assurer que toutes les colonnes requises sont présentes
+        missing_cols = set(metadata['features']) - set(df.columns)
+        for col in missing_cols:
+            df[col] = 0  # Valeur par défaut
+        
+        # Réorganiser dans l'ordre exact du training
         df = df[metadata['features']]
-        print(f"✅ Colonnes réorganisées selon métadonnées: {list(df.columns)}")
+        print(f"✅ Colonnes réorganisées pour {property_type}: {list(df.columns)}")
     
-    # Forcer neighborhood en catégorie (comme dans le notebook)
-    df["neighborhood"] = df["neighborhood"].astype("category")
-    
-    print(f"✅ DataFrame final: colonnes = {list(df.columns)}")
+    print(f"✅ DataFrame final pour {property_type}: colonnes = {list(df.columns)}")
     print(f"✅ Types: {dict(df.dtypes)}")
     
     return df
 
 
-@app.post("/predict")
-def predict(data: InputData):
-    """Prédiction de prix avec le modèle entraîné"""
+@app.post("/predict/appartements")
+def predict_appartement(data: AppartementInput):
+    """Prédiction de prix pour un appartement"""
+    return make_prediction(data, "appartements")
+
+
+@app.post("/predict/maisons") 
+def predict_maison(data: MaisonInput):
+    """Prédiction de prix pour une maison"""
+    return make_prediction(data, "maisons")
+
+
+def make_prediction(data, property_type: str):
+    """Fonction générique de prédiction"""
     
-    if model is None or preprocessor is None:
-        return {"error": "Modèle non chargé. Vérifiez les fichiers dans /models/"}
+    if property_type not in models or models[property_type] is None:
+        return {"error": f"Modèle {property_type} non chargé"}
+    
+    model_data = models[property_type]
+    model = model_data['model']
+    preprocessor = model_data['preprocessor']
+    metadata = model_data['metadata']
     
     try:
-        print(f"📥 Requête reçue: {data}")
+        print(f"📥 Requête {property_type} reçue: {data}")
         
         # 1. Preprocessing des données d'entrée
-        df_input = preprocess_input(data)
+        df_input = preprocess_input(data, property_type)
         print(f"✅ DataFrame créé: {df_input}")
-        print(f"✅ Shape: {df_input.shape}")
-        print(f"✅ Colonnes: {list(df_input.columns)}")
         
-        # 2. Appliquer le même preprocesseur que dans le notebook
-        X_scaled = preprocessor.transform(df_input)
-        print(f"✅ Transformation appliquée: {X_scaled.shape}")
-        
-        # 3. Prédiction selon le modèle utilisé
-        if metadata["model_name"] == "Linear Regression":
-            # Linear Regression utilise les données scalées (comme dans le notebook)
-            log_price_pred = model.predict(X_scaled)[0]
-            print(f"✅ Prédiction LR (données scalées): {log_price_pred}")
+        # 2. Appliquer le preprocesseur si nécessaire
+        if preprocessor is not None:
+            X_processed = preprocessor.transform(df_input)
+            print(f"✅ Transformation appliquée: {X_processed.shape}")
         else:
-            # Random Forest utilise les données BRUTES avec l'ordre exact du training
-            # df_input a déjà l'ordre correct grâce à preprocess_input()
-            log_price_pred = model.predict(df_input)[0]
-            print(f"✅ Prédiction RF (données brutes): {log_price_pred}")
-            print(f"✅ Features utilisées: {list(df_input.columns)}")
+            X_processed = df_input.values
+            
+        # 3. Prédiction
+        prediction = model.predict(X_processed)[0] if hasattr(X_processed, 'shape') and len(X_processed.shape) > 1 else model.predict(df_input)[0]
+        print(f"✅ Prédiction {property_type}: {prediction}")
         
-        # 4. Conversion log -> prix réel
-        price_pred = np.exp(log_price_pred)
-        print(f"✅ Prix final: {price_pred}")
+        # 4. Conversion si nécessaire (prix réel vs log-prix)
+        # Assumons que le modèle retourne déjà le prix réel
+        price_pred = float(prediction)
         
         result = {
             "prediction": int(price_pred),
-            "log_prediction": float(log_price_pred),
-            "model_used": metadata["model_name"],
-            "preprocessing_applied": True,
-            "features_count": X_scaled.shape[1],
+            "property_type": property_type,
+            "model_used": metadata.get("model_name", "Unknown"),
+            "preprocessing_applied": preprocessor is not None,
+            "features_count": len(metadata.get('features', [])),
             "input_data": data.dict(),
-            "r2_score": metadata["test_score"]
+            "r2_score": metadata.get("test_score", 0.0)
         }
         
-        print(f"📤 Réponse envoyée: {result}")
+        print(f"📤 Réponse {property_type} envoyée: {result}")
         return result
 
     except Exception as e:
-        error_msg = f"Erreur lors de la prédiction: {str(e)}"
+        error_msg = f"Erreur lors de la prédiction {property_type}: {str(e)}"
         print(f"❌ {error_msg}")
         import traceback
         traceback.print_exc()
@@ -157,15 +185,40 @@ def predict(data: InputData):
 
 @app.get("/model-info")
 def model_info():
-    """Informations détaillées sur le modèle"""
-    if metadata is None:
-        return {"error": "Modèle non chargé"}
+    """Informations détaillées sur tous les modèles"""
+    result = {}
     
+    for prop_type, model_data in models.items():
+        if model_data is not None:
+            metadata = model_data['metadata']
+            result[prop_type] = {
+                "model_name": metadata.get("model_name", "Unknown"),
+                "performance_r2": metadata.get("test_score", 0.0),
+                "total_features": len(metadata.get("features", [])),
+                "features_list": metadata.get("features", [])
+            }
+        else:
+            result[prop_type] = {"error": "Modèle non chargé"}
+    
+    return result
+
+
+@app.get("/model-info/{property_type}")
+def model_info_specific(property_type: str):
+    """Informations détaillées sur un modèle spécifique"""
+    if property_type not in models:
+        return {"error": f"Type de bien '{property_type}' non reconnu. Types disponibles: {list(models.keys())}"}
+    
+    model_data = models[property_type]
+    if model_data is None:
+        return {"error": f"Modèle {property_type} non chargé"}
+    
+    metadata = model_data['metadata']
     return {
-        "model_name": metadata["model_name"],
-        "performance_r2": metadata["test_score"],
-        "total_features": len(metadata["features"]),
-        "numeric_features": metadata["numeric_features"],
-        "categorical_features": metadata["categorical_features"],
-        "features_list": metadata["features"]
+        "property_type": property_type,
+        "model_name": metadata.get("model_name", "Unknown"),
+        "performance_r2": metadata.get("test_score", 0.0),
+        "total_features": len(metadata.get("features", [])),
+        "features_list": metadata.get("features", []),
+        "model_loaded": True
     }

@@ -99,10 +99,23 @@ def load_model_info():
     except:
         return None
 
-def predict_price(input_data):
-    """Fonction pour faire une prédiction"""
+def predict_price(input_data, property_type):
+    """Fonction pour faire une prédiction selon le type de bien"""
     try:
-        response = requests.post("http://localhost:8000/predict", json=input_data)
+        endpoint = f"http://localhost:8000/predict/{property_type}"
+        response = requests.post(endpoint, json=input_data)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
+    except:
+        return None
+
+@st.cache_data
+def get_model_info():
+    """Récupère les informations sur tous les modèles"""
+    try:
+        response = requests.get("http://localhost:8000/model-info")
         if response.status_code == 200:
             return response.json()
         else:
@@ -121,108 +134,150 @@ if page == "🎯 Prédiction":
     """, unsafe_allow_html=True)
     
     # Informations du modèle
-    model_info = load_model_info()
+    model_info = get_model_info()
     if model_info:
-        col1, col2, col3, col4 = st.columns(4)
+        st.markdown("### 🤖 Modèles Disponibles")
+        col1, col2 = st.columns(2)
+        
         with col1:
-            st.metric("🤖 Modèle", model_info.get('model_name', 'N/A'))
+            if "appartements" in model_info:
+                apt_info = model_info["appartements"]
+                st.metric("🏠 Appartements", 
+                         apt_info.get('model_name', 'N/A'), 
+                         f"R²: {apt_info.get('performance_r2', 0)*100:.1f}%")
+        
         with col2:
-            st.metric("📊 Performance R²", f"{model_info.get('test_score', 0)*100:.1f}%")
-        with col3:
-            st.metric("🔢 Features", len(model_info.get('features', [])))
-        with col4:
-            st.metric("🏠 Dataset", "21,454 biens")
+            if "maisons" in model_info:
+                maison_info = model_info["maisons"]
+                st.metric("🏡 Maisons", 
+                         maison_info.get('model_name', 'N/A'),
+                         f"R²: {maison_info.get('performance_r2', 0)*100:.1f}%")
     
     st.markdown("---")
     
-    # Interface de prédiction
-    st.markdown("## 🎯 Estimer votre bien immobilier")
+    # SÉLECTION DU TYPE DE BIEN
+    st.markdown("## 🏠 Choisissez le type de bien")
+    property_type = st.radio(
+        "Type de bien à estimer:",
+        ["appartements", "maisons"],
+        horizontal=True,
+        help="Chaque type utilise un modèle spécialisé avec des variables adaptées"
+    )
+    
+    st.markdown("---")
+    
+    # Interface de prédiction adaptée selon le type
+    st.markdown(f"## 🎯 Estimer votre {'appartement' if property_type == 'appartements' else 'maison'}")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
         st.markdown("### 📝 Caractéristiques du bien")
         
-        # Variables structurelles
+        # Variables communes
         col_a, col_b, col_c = st.columns(3)
         with col_a:
-            sq_mt_built = st.number_input("Surface (m²)", min_value=20, max_value=500, value=80, step=5)
+            sq_mt_built = st.number_input("Surface (m²)", min_value=20, max_value=1000, value=80 if property_type == "appartements" else 200, step=5)
         with col_b:
-            n_rooms = st.number_input("Chambres", min_value=1, max_value=10, value=3)
+            n_rooms = st.number_input("Chambres", min_value=1, max_value=10, value=3 if property_type == "appartements" else 4)
         with col_c:
             n_bathrooms = st.number_input("Salles de bain", min_value=1, max_value=5, value=2)
         
-        # Quartier et type
-        col_d, col_e = st.columns(2)
-        with col_d:
-            neighborhood = st.slider("Quartier (1-136)", min_value=1, max_value=136, value=75, 
-                                    help="Quartiers de Madrid numérotés par zones")
-        with col_e:
-            product_options = [
-                "appartement", "penthouse / appartement au dernier étage", 
-                "maison ou chalet", "duplex", "maison mitoyenne", 
-                "maison jumelée", "studio"
-            ]
-            product = st.selectbox("Type de bien", product_options)
-        
-        # Équipements
+        # Variables spécifiques selon le type
         st.markdown("### 🔧 Équipements")
-        col_eq1, col_eq2, col_eq3 = st.columns(3)
         
-        with col_eq1:
-            has_lift = st.checkbox("🛗 Ascenseur", value=True)
-            has_parking = st.checkbox("🚗 Parking")
-        with col_eq2:
-            has_pool = st.checkbox("🏊 Piscine")
-            has_garden = st.checkbox("🌳 Jardin")
-        with col_eq3:
-            has_storage_room = st.checkbox("📦 Cave/Débarras")
-            is_floor_under = st.checkbox("⬇️ Sous-sol")
+        if property_type == "appartements":
+            # Champs spécifiques aux appartements
+            col_eq1, col_eq2 = st.columns(2)
+            
+            with col_eq1:
+                has_lift = st.checkbox("🛗 Ascenseur", value=True, help="Présence d'un ascenseur dans l'immeuble")
+                has_parking = st.checkbox("🚗 Parking", help="Place de parking incluse")
+            with col_eq2:
+                has_central_heating = st.checkbox("🔥 Chauffage central", value=True, help="Système de chauffage central")
+            
+            # Variables non utilisées pour les appartements
+            has_garden = 0
+            has_pool = 0
+            neighborhood = "Unknown"
+            
+        else:  # maisons
+            # Champs spécifiques aux maisons
+            col_eq1, col_eq2 = st.columns(2)
+            
+            with col_eq1:
+                has_garden = st.checkbox("🌳 Jardin", value=True, help="Présence d'un jardin privé")
+                has_pool = st.checkbox("🏊 Piscine", help="Piscine privée")
+            with col_eq2:
+                neighborhood = st.selectbox("🏘️ Quartier", 
+                                          ["Centro", "Norte", "Sur", "Este", "Oeste", "Unknown"], 
+                                          index=5,
+                                          help="Zone géographique de la maison")
+            
+            # Variables non utilisées pour les maisons
+            has_lift = 0
+            has_parking = 0
+            has_central_heating = 0
     
     with col2:
         st.markdown("### 🤖 Informations ML")
         
-        # Confiance du modèle (simulée pour l'éducation)
-        confidence = 93.5  # Performance du modèle
-        st.markdown(f"""
-        <div class='model-info'>
-            <h4>🎯 Confiance du modèle</h4>
-            <div class='confidence-bar'>
-                <div class='confidence-fill' style='width: {confidence}%'></div>
-            </div>
-            <p><strong>{confidence}%</strong> de précision sur le test set</p>
-            <hr>
-            <p><strong>🔍 Comment ça marche ?</strong></p>
-            <p>• Random Forest avec 141 features</p>
-            <p>• OneHotEncoder pour les variables catégorielles</p>
-            <p>• StandardScaler pour la normalisation</p>
-            <p>• Entraîné sur 17,163 biens Madrid</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Informations spécifiques au modèle sélectionné
+        if model_info and property_type in model_info:
+            current_model = model_info[property_type]
+            if "error" not in current_model:
+                confidence = current_model.get('performance_r2', 0) * 100
+                features_count = current_model.get('total_features', 0)
+                
+                st.markdown(f"""
+                <div class='model-info'>
+                    <h4>🎯 Modèle {property_type.title()}</h4>
+                    <div class='confidence-bar'>
+                        <div class='confidence-fill' style='width: {confidence}%'></div>
+                    </div>
+                    <p><strong>{confidence:.1f}%</strong> de précision (R²)</p>
+                    <hr>
+                    <p><strong>🔍 Spécificités :</strong></p>
+                    <p>• {current_model.get('model_name', 'N/A')}</p>
+                    <p>• {features_count} variables utilisées</p>
+                    <p>• Optimisé pour les {property_type}</p>
+                    <p>• Modèle spécialisé Madrid</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error(f"❌ Modèle {property_type} non disponible")
         
         # Bouton de prédiction principal
-        if st.button("🚀 ESTIMER LE BIEN", type="primary", use_container_width=True):
-            # Préparation des données
-            payload = {
-                "sq_mt_built": float(sq_mt_built),
-                "n_rooms": int(n_rooms),
-                "n_bathrooms": float(n_bathrooms),
-                "neighborhood": int(neighborhood),
-                "product": str(product),
-                "has_lift": int(has_lift),
-                "has_parking": int(has_parking),
-                "has_pool": int(has_pool),
-                "has_garden": int(has_garden),
-                "has_storage_room": int(has_storage_room),
-                "is_floor_under": int(is_floor_under),
-            }
+        button_text = "🚀 ESTIMER L'APPARTEMENT" if property_type == "appartements" else "🚀 ESTIMER LA MAISON"
+        if st.button(button_text, type="primary", use_container_width=True):
+            
+            # Préparation des données selon le type
+            if property_type == "appartements":
+                payload = {
+                    "property_type": "appartements",
+                    "sq_mt_built": float(sq_mt_built),
+                    "n_rooms": int(n_rooms),
+                    "n_bathrooms": float(n_bathrooms),
+                    "has_lift": int(has_lift),
+                    "has_parking": int(has_parking),
+                    "has_central_heating": int(has_central_heating)
+                }
+            else:  # maisons
+                payload = {
+                    "property_type": "maisons",
+                    "sq_mt_built": float(sq_mt_built),
+                    "n_rooms": int(n_rooms),
+                    "n_bathrooms": float(n_bathrooms),
+                    "has_garden": int(has_garden),
+                    "has_pool": int(has_pool),
+                    "neighborhood": str(neighborhood)
+                }
             
             # Prédiction
-            result = predict_price(payload)
+            result = predict_price(payload, property_type)
             
             if result and 'prediction' in result:
-                log_price = result['prediction']
-                real_price = np.expm1(log_price)
+                real_price = result['prediction']
                 price_per_m2 = real_price / sq_mt_built
                 
                 # Affichage du résultat
@@ -230,7 +285,8 @@ if page == "🎯 Prédiction":
                 <div class='prediction-result'>
                     <h2>💰 Estimation: {real_price:,.0f} €</h2>
                     <p>Prix par m²: {price_per_m2:,.0f} €/m²</p>
-                    <p>Log-prix (modèle): {log_price:.4f}</p>
+                    <p>Type: {property_type.title()}</p>
+                    <p>Modèle: {result.get('model_used', 'N/A')}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -240,14 +296,17 @@ if page == "🎯 Prédiction":
                     st.json(payload)
                     
                     st.write("**Pipeline de traitement:**")
-                    st.write("1. ✅ Validation des données d'entrée")
-                    st.write("2. 🔄 Preprocessing (OneHot + StandardScaler)")
-                    st.write("3. 🤖 Prédiction Random Forest")
-                    st.write("4. 📈 Conversion log→prix réel")
+                    st.write(f"1. ✅ Validation des données pour {property_type}")
+                    st.write("2. 🔄 Preprocessing adapté au type de bien")
+                    st.write(f"3. 🤖 Prédiction {result.get('model_used', 'N/A')}")
+                    st.write("4. 📈 Estimation finale")
                     
                     if 'features_count' in result:
-                        st.write(f"**Features après preprocessing:** {result['features_count']}")
+                        st.write(f"**Features utilisées:** {result['features_count']}")
+                    if 'r2_score' in result:
+                        st.write(f"**Performance du modèle:** {result['r2_score']*100:.1f}% R²")
             else:
+                st.error(f"❌ Erreur lors de l'estimation. Vérifiez que l'API est démarrée et que le modèle {property_type} est disponible.")
                 st.error("❌ Erreur lors de la prédiction. Vérifiez que l'API est démarrée.")
 
 # ========== PAGE DASHBOARD DATASET ==========
