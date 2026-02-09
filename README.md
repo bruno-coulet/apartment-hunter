@@ -76,10 +76,17 @@ Accès:
 
 Commandes utiles:
 ```bash
-# redemarrer les service
+# Relancer les services
+docker compose up -d
+
+# Redémarrer les services
 docker compose restart api streamlit
+
+# Voir les logs
 docker compose logs -f api
 docker compose logs -f streamlit
+
+# Arrêter les services
 docker compose down
 ```
 
@@ -172,7 +179,7 @@ Artefacts sauvegardés dans `models/`:
 - `streamlit_config.json` (colonnes UI, ranges, valeurs catégorielles).
 
 Après ré‑export, redémarrer les services pour la prise en compte:
- 
+```bash
 docker compose restart api streamlit
 ```
 
