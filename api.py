@@ -3,14 +3,15 @@ from pydantic import BaseModel
 from typing import Optional
 import pandas as pd
 import numpy as np
-
-
-
 import pickle
 import os
 from pathlib import Path
 
-app = FastAPI()
+app = FastAPI(
+    title="Apartment Hunter API",
+    description="API de prédiction de prix immobilier pour appartements et maisons",
+    version="1.0.0"
+)
 
 # --------- CHARGEMENT DES MODÈLES ----------
 MODEL_DIR = Path("models")
@@ -252,3 +253,10 @@ def model_info_specific(property_type: str):
         "features_list": metadata.get("features", []),
         "model_loaded": True
     }
+
+
+# --------- POINT D'ENTRÉE PRINCIPAL ----------
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 Démarrage du serveur API...")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
