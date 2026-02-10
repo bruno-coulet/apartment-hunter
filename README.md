@@ -148,8 +148,9 @@ Réponse:
 ```
 
 Notes:
-- `neighborhood` est transmis en entier côté UI; l'API le convertit en chaîne pour le OneHotEncoder.
+- `neighborhood` est transmis en **entier** (int) côté UI/JSON, mais l'API le convertit automatiquement en **string** pour le OneHotEncoder (cohérence avec l'entraînement).
 - En cas d'erreur 422, vérifier que les 10 champs sont fournis avec les bons types.
+- **Important** : Les valeurs de `neighborhood` doivent être comprises entre 1 et 135 (IDs de quartiers Madrid).
 
 ---
 
@@ -208,9 +209,10 @@ docker compose restart api streamlit
 
 ## Dépannage
 
+- **`neighborhood` non pris en compte** : ✅ **[CORRIGÉ]** L'API convertit désormais `neighborhood` en string (cohérence avec l'entraînement). Si le problème persiste, vérifier que `xgboost_model.pkl` est bien chargé (ligne 19 de `api.py`).
 - **422 sur /predict** : Vérifier les 10 champs, types, et que les valeurs sont dans les ranges de `streamlit_config.json`. Relancer `docker compose restart api`.
 - **Valeurs inf/nan** : L'API retourne déjà les euros (conversion automatique de log). Ne pas appliquer `exp()` côté client.
-- **Catégories inconnues** : `neighborhood` doit correspondre aux valeurs de `streamlit_config.json`. L'API convertit en chaîne pour le OneHotEncoder.
+- **Catégories inconnues** : `neighborhood` doit correspondre aux valeurs de `streamlit_config.json` (IDs 1-135). L'API convertit en chaîne pour le OneHotEncoder.
 - **Segment luxe (>1.15M€)** : Le modèle n'a pas été entraîné sur ce segment. Résultats non fiables. Une v2 avec modèle luxe est envisagée.
 
 ---
