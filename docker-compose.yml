@@ -10,56 +10,9 @@
 # Dev : Les volumes répercutent tes modifs Windows (api.py) sans rebuild.
 
 # =========================================================
-# services:
-#   # API FastAPI
-#   api:
-#     build:
-#       context: .
-#       dockerfile: Dockerfile
-#     container_name: apartment-api
-#     ports:
-#       - "8000:8000"
-#     environment:
-#       - PYTHONUNBUFFERED=1
-#     volumes:
-#       - .:/app  # Montage de la racine pour le développement (Hot Reload)
-#       - /app/.venv  # <--- AJOUTE CETTE LIGNE : elle isole le venv du conteneur
-#       - ./models:/app/models:ro
-#       - ./data_model:/app/data_model:ro
-#     healthcheck:
-#       # On teste la racine de l'API pour vérifier qu'elle répond
-#       # test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-#       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
-#       interval: 10s
-#       timeout: 5s
-#       retries: 5
-#       start_period: 10s
-
-  # Streamlit UI
-  # streamlit:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.streamlit
-  #   container_name: apartment-streamlit
-  #   ports:
-  #     - "8501:8501"
-  #   environment:
-  #     - PYTHONUNBUFFERED=1
-  #   depends_on:
-  #     api:
-  #       condition: service_healthy
-  #   volumes:
-  #     - .:/app # Partage du code source
-  #     - /app/.venv
-  #     - ./streamlit_app:/app/streamlit_app
-  #   # Commande lancée via 'uv run' pour garantir l'utilisation de l'environnement virtuel
-  #   command: uv run streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0
-
-
-
 
 services:
-  # Bloc pour l'API
+  # Bloc pour le Back, l'API
   api:
     build:
       context: .
@@ -75,7 +28,7 @@ services:
       - ./models:/app/models:ro
       - ./data_model:/app/data_model:ro
 
-  # Bloc pour l'interface Streamlit
+  # Bloc pour le front, l'interface Streamlit
   streamlit:
     build:
       context: .

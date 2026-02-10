@@ -4,13 +4,17 @@ Outil de prédiction de prix immobilier (Madrid) basé sur FastAPI, Streamlit, s
 
 ---
 
-## 📋 Vue d'ensemble
+## Vue d'ensemble
 
 Le projet expose:
-- une API FastAPI pour la prédiction,
-- une UI Streamlit pour saisir les caractéristiques et afficher le prix estimé.
+- une **API FastAPI** (Backend) pour la prédiction,
+- une **UI Streamlit** (Frontend) pour saisir les caractéristiques et afficher le prix estimé.
 
-Le modèle actuel utilise 10 variables et prédit le log‑prix pendant l'entraînement, puis retourne le prix en euros côté API.
+**Modèle sélectionné** : **XGBoost** (meilleure performance)
+- 10 variables d'entrée
+- Entraîné sur le segment standard (prix ≤ 1.15M€)
+- Prédiction du log-prix en entraînement, conversion en euros côté API
+- **Performance** : MAE = 55.4 k€, RMSE = 82.2 k€, MAPE = 15.48% (sur test standard)
 
 ### Architecture
 
@@ -33,7 +37,7 @@ Le modèle actuel utilise 10 variables et prédit le log‑prix pendant l'entra�
 
 ---
 
-## 📁 Structure du projet
+## Structure du projet
 
 ```
 apartment-hunter/
@@ -48,10 +52,10 @@ apartment-hunter/
 ├── data_cleaned/
 ├── data_model/
 ├── models/
-│   ├── ridge_model.pkl
-│   ├── preprocessor.pkl
-│   ├── model_config.json         # colonnes du modèle (10), use_log, etc.
-│   └── streamlit_config.json     # colonnes UI, ranges et catégories
+│   ├── xgboost_model.pkl         # Modèle XGBoost (meilleur)
+│   ├── preprocessor.pkl          # Pipeline preprocessing sklearn
+│   ├── model_config.json         # Config API : colonnes (10), use_log, segment
+│   └── streamlit_config.json     # Config UI : ranges et valeurs catégories
 ├── raw_data/
 ├── pyproject.toml                 # gestion via uv
 ├── Dockerfile
@@ -62,7 +66,7 @@ apartment-hunter/
 
 ---
 
-## 🚀 Lancer avec Docker Compose (recommandé)
+## Lancer avec Docker Compose (recommandé)
 
 1. Lancer l'application Docker Desktop
 2. Sur un terminal, lancer la commande :
@@ -92,7 +96,7 @@ docker compose down
 
 ---
 
-## 🔧 API
+## API
 
 ### Santé
 ```bash
@@ -149,7 +153,7 @@ Notes:
 
 ---
 
-## 🖥️ UI Streamlit
+## UI Streamlit
 
 L'UI consomme `models/streamlit_config.json` pour:
 - la liste des colonnes d'entrée,
@@ -167,32 +171,50 @@ uv run streamlit run streamlit_app/app.py
 
 ---
 
-## 🧠 Modèle & artefacts
+## Modèle & Performance
 
-Le notebook [3_model.ipynb](3_model.ipynb) entraîne un pipeline scikit‑learn:
-- Prétraitement: `SimpleImputer` + `StandardScaler` (numériques) et `OneHotEncoder` (catégorie `neighborhood`, drop='first'),
-- Modèle: `Ridge` entraîné sur `log(buy_price)`.
+Le notebook [3_model.ipynb](3_model.ipynb) entraîne et compare deux modèles :
 
-Artefacts sauvegardés dans `models/`:
-- `ridge_model.pkl`, `preprocessor.pkl`,
-- `model_config.json` (colonnes du modèle, `use_log`),
-- `streamlit_config.json` (colonnes UI, ranges, valeurs catégorielles).
+### Modèle final : **XGBoost** ✅
+- **Avantage** : Capture les interactions non-linéaires entre variables
+- **Entraînement** : Segment standard (prix ≤ 1.15M€ → 95% du marché)
+- **Performance (Test Standard)** :
+  - **R²** : 0.9105 (91% de variance expliquée)
+  - **MAE** : 55.4 k€ (erreur moyenne)
+  - **RMSE** : 82.2 k€ (pénalise les grandes erreurs)
+  - **MAPE** : 15.48% (erreur relative)
 
-Après ré‑export, redémarrer les services pour la prise en compte:
+### Pourquoi XGBoost vs Ridge ?
+| Métrique | Ridge | XGBoost | Gain |
+|----------|-------|---------|------|
+| MAE | 70.7 k€ | 55.4 k€ | **-21.6%** |
+| RMSE | 133.8 k€ | 82.2 k€ | **-38.6%** |
+| MAPE | 17.52% | 15.48% | **-11.7%** |
+
+### Artefacts sauvegardés
+- `xgboost_model.pkl` : Modèle entraîné
+- `preprocessor.pkl` : Pipeline (StandardScaler + OneHotEncoder)
+- `model_config.json` : Config API (colonnes, segment, threshold)
+- `streamlit_config.json` : Config UI (ranges, catégories)
+
+Après ré-entraînement et export du modèle, redémarrer les services :
 ```bash
 docker compose restart api streamlit
 ```
 
----
-
-## 🛠️ Dépannage
-
-- 422 sur /predict: vérifier les 10 champs et types; relancer `docker compose restart api`.
-- Valeurs `inf`/`nan`: vérifier que l'UI n'applique pas `exp()` côté client; l'API renvoie déjà des euros.
-- Catégories inconnues: `neighborhood` doit correspondre aux valeurs de `streamlit_config.json` (l'API convertit en chaîne pour le OneHotEncoder).
+**Note** : Le modèle n'accepte que le segment standard (≤1.15M€). Les biens de luxe retourneront une erreur ou une prédiction dégradée.
 
 ---
 
-## 📝 Licence
+## Dépannage
+
+- **422 sur /predict** : Vérifier les 10 champs, types, et que les valeurs sont dans les ranges de `streamlit_config.json`. Relancer `docker compose restart api`.
+- **Valeurs inf/nan** : L'API retourne déjà les euros (conversion automatique de log). Ne pas appliquer `exp()` côté client.
+- **Catégories inconnues** : `neighborhood` doit correspondre aux valeurs de `streamlit_config.json`. L'API convertit en chaîne pour le OneHotEncoder.
+- **Segment luxe (>1.15M€)** : Le modèle n'a pas été entraîné sur ce segment. Résultats non fiables. Une v2 avec modèle luxe est envisagée.
+
+---
+
+## Licence
 
 Projet de groupe - 2026

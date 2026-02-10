@@ -560,7 +560,10 @@ def eval_model_apart(
     """
     Variante de evaluate_model qui corrige la transformation log1p
     et affiche RMSE/MAE en euros.
+    Compatible avec matrices sparse (scipy >= 1.13).
     """
+    from scipy.sparse import issparse
+    
     # Si la param grid est vide, entrainement sans optimisation
     if param_grid is None:
         algo.fit(X_train, y_train)
