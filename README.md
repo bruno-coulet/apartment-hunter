@@ -66,19 +66,19 @@ apartment-hunter/
 
 ---
 
-## Lancer avec Docker Compose (recommandé)
+## Option 1 : Utiliser Docker Compose (recommandé)
 
-1. Lancer l'application Docker Desktop
-2. Sur un terminal, lancer la commande :
+1. Lancer l'application Docker Desktop.
+2. Dans un terminal, exécuter la commande suivante :
 ```bash
 docker compose up -d --build
 ```
 
-Accès:
-- Streamlit: http://localhost:8501
-- API (docs): http://localhost:8000/docs
+Accès :
+- **Streamlit** : [http://localhost:8501](http://localhost:8501)
+- **API (docs)** : [http://localhost:8000/docs](http://localhost:8000/docs)
 
-Commandes utiles:
+Commandes utiles :
 ```bash
 # Relancer les services
 docker compose up -d
@@ -93,6 +93,12 @@ docker compose logs -f streamlit
 # Arrêter les services
 docker compose down
 ```
+
+---
+
+## Option 2 : Démarrer les conteneurs manuellement
+
+Si les conteneurs existent déjà, ouvrez Docker Desktop et démarrez les conteneurs existants. Assurez-vous que les images nécessaires sont disponibles localement.
 
 ---
 
