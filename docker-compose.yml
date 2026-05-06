@@ -22,15 +22,15 @@ services:
       - ./data_model:/app/data_model:ro
     networks:
       - web
-    deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.apartment-api.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/api`)"
-        - "traefik.http.routers.apartment-api.entrypoints=websecure"
-        - "traefik.http.routers.apartment-api.tls.certresolver=myresolver"
-        - "traefik.http.services.apartment-api.loadbalancer.server.port=8000"
-        - "traefik.http.routers.apartment-api.middlewares=api-stripprefix"
-        - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
+    # deploy:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apartment-api.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.apartment-api.entrypoints=websecure"
+      - "traefik.http.routers.apartment-api.tls.certresolver=myresolver"
+      - "traefik.http.services.apartment-api.loadbalancer.server.port=8000"
+      - "traefik.http.routers.apartment-api.middlewares=api-stripprefix"
+      - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
 
   # Bloc pour le Front-end (Interface Streamlit)
   streamlit:
@@ -52,13 +52,13 @@ services:
       - web
     # Note : Ajout du baseUrlPath pour le routage Traefik
     command: uv run streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0 --server.baseUrlPath=/apartment
-    deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.apartment-ui.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment`)"
-        - "traefik.http.routers.apartment-ui.entrypoints=websecure"
-        - "traefik.http.routers.apartment-ui.tls.certresolver=myresolver"
-        - "traefik.http.services.apartment-ui.loadbalancer.server.port=8501"
+    # deploy:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apartment-ui.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment`)"
+      - "traefik.http.routers.apartment-ui.entrypoints=websecure"
+      - "traefik.http.routers.apartment-ui.tls.certresolver=myresolver"
+      - "traefik.http.services.apartment-ui.loadbalancer.server.port=8501"
 
 networks:
   web:
