@@ -74,9 +74,17 @@ apartment-hunter/
 docker compose up -d --build
 ```
 
-Accès :
-- **Streamlit** : [http://localhost:8501](http://localhost:8501)
-- **API (docs)** : [http://localhost:8000/docs](http://localhost:8000/docs)
+3. (optionel) Vérifier si les conteneurs sont bien actifs :
+```bash
+docker compose ps
+```
+
+4. Accès à l'interface FastAPI.  
+[http://localhost:8000/docs](http://localhost:8000/docs)
+5. Accès à l'interface Streamlit.  
+[http://localhost:8501](http://localhost:8501)
+
+
 
 Commandes utiles :
 ```bash
@@ -98,16 +106,26 @@ docker compose down
 
 ## Option 2 : Démarrer les conteneurs manuellement
 
-Si les conteneurs existent déjà, ouvrez Docker Desktop et démarrez les conteneurs existants. Assurez-vous que les images nécessaires sont disponibles localement.
+Cette option sert quand l'environnement Docker a déjà été préparé : les images sont déjà construites et les conteneurs ont déjà été créés une première fois.
+
+Dans ce cas, pas besoin de relancer un build complet. Il suffit d'ouvrir Docker Desktop et de démarrer les conteneurs existants, ou les relancer depuis le terminal si besoin.
+
+Il faut vérifier que les images nécessaires sont bien présentes en local, sinon il faudra revenir à l'option 1 pour reconstruire l'ensemble.
 
 ---
 
 ## API
 
 ### Santé
+Cette commande appelle la route racine GET / de l'API. Elle ne lance pas de prédiction : elle sert juste à vérifier que le service FastAPI répond bien.
+
+Si tout fonctionne, l'API renvoie un petit JSON avec son état, par exemple si le service tourne et si le modèle a bien été chargé.
+
 ```bash
 curl http://localhost:8000/
 ```
+
+Si cette commande répond, cela veut dire que l'API est accessible avant de tester /predict.
 
 ### Prédire un prix
 Entrée attendue (10 features):
