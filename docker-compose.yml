@@ -1,47 +1,64 @@
 # =========================================================
-# CONFIGURATION DE L'API MADRID
-
-# Ce service gère le chargement des modèles Scikit-Learn
-# et expose les routes FastAPI sur le port 8000.
-
-# Communication : Dans app.py, utilise http://api:8000/predict.
-# Docker Compose lie les services par leur nom (api) via son réseau interne.
-# Fiabilité : Healthcheck à 10s pour un démarrage rapide de Streamlit après l'API.
-# Dev : Les volumes répercutent tes modifs Windows (api.py) sans rebuild.
-
+# CONFIGURATION DÉPLOIEMENT MULTI-POC (TRAEFIK READY)
+# Projet : Apartment Hunter
 # =========================================================
 
 services:
-  # Bloc pour le Back, l'API
+  # Bloc pour le Back-end (API FastAPI)
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: apartment-api
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
       - .:/app
-      - /app/.venv  # Volume anonyme pour isoler l'environnement Linux
+      - /app/.venv
       - ./models:/app/models:ro
       - ./data_model:/app/data_model:ro
+    networks:
+      - web
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.apartment-api.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/api`)"
+        - "traefik.http.routers.apartment-api.entrypoints=websecure"
+        - "traefik.http.routers.apartment-api.tls.certresolver=myresolver"
+        - "traefik.http.services.apartment-api.loadbalancer.server.port=8000"
+        - "traefik.http.routers.apartment-api.middlewares=api-stripprefix"
+        - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
 
-  # Bloc pour le front, l'interface Streamlit
+  # Bloc pour le Front-end (Interface Streamlit)
   streamlit:
     build:
       context: .
       dockerfile: Dockerfile.streamlit
     container_name: apartment-streamlit
-    ports:
-      - "8501:8501"
+    expose:
+      - "8501"
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
       - api
     volumes:
       - .:/app
-      - /app/.venv  # Indispensable pour éviter le conflit avec Windows
+      - /app/.venv
       - ./streamlit_app:/app/streamlit_app
-    command: uv run streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0
+    networks:
+      - web
+    # Note : Ajout du baseUrlPath pour le routage Traefik
+    command: uv run streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0 --server.baseUrlPath=/apartment
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.apartment-ui.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment`)"
+        - "traefik.http.routers.apartment-ui.entrypoints=websecure"
+        - "traefik.http.routers.apartment-ui.tls.certresolver=myresolver"
+        - "traefik.http.services.apartment-ui.loadbalancer.server.port=8501"
+
+networks:
+  web:
+    external: true
