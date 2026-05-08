@@ -29,6 +29,7 @@ import streamlit as st
 API_URL = "http://api:8000/api/predict"
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
+NEIGHBORHOOD_MAPPING_FILE = PROJECT_ROOT / "models" / "neighborhood_mapping.json"
 
 # --- HELPERS ---
 def format_euros(value: float) -> str:
@@ -68,6 +69,14 @@ def load_neighborhood_mapping() -> dict[int, str]:
 
     Retourne un dictionnaire {id: nom}. En cas d'échec, renvoie un dict vide.
     """
+    if NEIGHBORHOOD_MAPPING_FILE.exists():
+        try:
+            with open(NEIGHBORHOOD_MAPPING_FILE, encoding="utf-8") as f:
+                raw_mapping = json.load(f)
+            return {int(key): value for key, value in raw_mapping.items()}
+        except Exception:
+            pass
+
     csv_paths = [PROJECT_ROOT / "raw_data/houses_madrid.csv", BASE_DIR / "../raw_data/houses_madrid.csv"]
     csv_path = next((path for path in csv_paths if path.exists()), None)
     if csv_path is None:

@@ -24,6 +24,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 ROOT = Path(__file__).resolve().parent
 DATA_MODEL_DIR = ROOT / "data_model"
 MODELS_DIR = ROOT / "models"
+RAW_DATA_PATH = ROOT / "raw_data" / "houses_madrid.csv"
 
 USEFUL_FEATURES = [
     "sq_mt_built",
@@ -48,6 +49,27 @@ BINARY_FEATURES = [
     "has_storage_room",
     "is_floor_under",
 ]
+
+
+def construire_mapping_quartiers() -> dict[int, str]:
+    """Construit le mapping id -> nom de quartier à partir du CSV brut."""
+    try:
+        df = pd.read_csv(RAW_DATA_PATH, encoding="utf-8-sig")
+    except Exception:
+        df = pd.read_csv(RAW_DATA_PATH, encoding="latin-1")
+
+    if "neighborhood_id" not in df.columns:
+        return {}
+
+    import re
+
+    mapping: dict[int, str] = {}
+    pattern = re.compile(r"Neighborhood\s+(\d+):\s*([^\(\-]+)")
+    for raw in df["neighborhood_id"].dropna().unique().tolist():
+        match = pattern.search(str(raw))
+        if match:
+            mapping[int(match.group(1))] = match.group(2).strip()
+    return mapping
 
 
 def charger_donnees() -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
@@ -163,6 +185,10 @@ def sauvegarder_artefacts(
     }
     with open(MODELS_DIR / "streamlit_config.json", "w", encoding="utf-8") as f:
         json.dump(streamlit_config, f, indent=2, ensure_ascii=False)
+
+    neighborhood_mapping = construire_mapping_quartiers()
+    with open(MODELS_DIR / "neighborhood_mapping.json", "w", encoding="utf-8") as f:
+        json.dump(neighborhood_mapping, f, indent=2, ensure_ascii=False, sort_keys=True)
 
 
 def main() -> None:
