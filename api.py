@@ -17,9 +17,9 @@ app = FastAPI(title="Apartment Hunter API",
     root_path="/api")
 
 # --- CONFIGURATION DES CHEMINS ---
-MODEL_PATH = "models/xgboost_model.pkl"
-PREPROCESSOR_PATH = "models/preprocessor.pkl"
-CONFIG_PATH = "models/model_config.json"
+MODEL_PATH = "/app/models/xgboost_model.pkl"
+PREPROCESSOR_PATH = "/app/models/preprocessor.pkl"
+CONFIG_PATH = "/app/models/model_config.json"
 
 # --- VARIABLES GLOBALES ---
 model = None

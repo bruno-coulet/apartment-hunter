@@ -24,7 +24,8 @@ import requests
 import streamlit as st
 
 # --- CONFIGURATION ---
-API_URL = "http://api:8000/predict"
+# le préfixe /api/  est désormais géré par le root_path de FastAPI
+API_URL = "http://api:8000/api/predict"
 
 # --- HELPERS ---
 def format_euros(value: float) -> str:
