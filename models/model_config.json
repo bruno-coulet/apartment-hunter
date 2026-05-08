@@ -1,0 +1,19 @@
+{
+  "input_columns": [
+    "sq_mt_built",
+    "n_rooms",
+    "n_bathrooms",
+    "neighborhood",
+    "has_lift",
+    "has_parking",
+    "has_pool",
+    "has_garden",
+    "has_storage_room",
+    "is_floor_under"
+  ],
+  "model_type": "XGBoost",
+  "target": "log_buy_price",
+  "use_log": true,
+  "segment": "standard",
+  "threshold_eur": 1150000
+}
