@@ -17,6 +17,7 @@ Cartouche :
 import json
 import os
 import re
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,8 @@ import streamlit as st
 # --- CONFIGURATION ---
 # le préfixe /api/  est désormais géré par le root_path de FastAPI
 API_URL = "http://api:8000/api/predict"
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
 
 # --- HELPERS ---
 def format_euros(value: float) -> str:
@@ -41,10 +44,10 @@ def format_euros(value: float) -> str:
 @st.cache_resource
 def load_config():
     """Charge la config Streamlit générée lors de l'entraînement."""
-    config_paths = ["models/streamlit_config.json", "../models/streamlit_config.json"]
+    config_paths = [PROJECT_ROOT / "models/streamlit_config.json", BASE_DIR / "../models/streamlit_config.json"]
     for path in config_paths:
-        if os.path.exists(path):
-            with open(path) as f:
+        if path.exists():
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
     # Fallback
     return {
@@ -65,15 +68,19 @@ def load_neighborhood_mapping() -> dict[int, str]:
 
     Retourne un dictionnaire {id: nom}. En cas d'échec, renvoie un dict vide.
     """
-    csv_path = "raw_data/houses_madrid.csv"
-    if not os.path.exists(csv_path):
+    csv_paths = [PROJECT_ROOT / "raw_data/houses_madrid.csv", BASE_DIR / "../raw_data/houses_madrid.csv"]
+    csv_path = next((path for path in csv_paths if path.exists()), None)
+    if csv_path is None:
         return {}
 
     # Lecture robuste (accents)
     try:
-        df = pd.read_csv(csv_path, encoding="latin-1")
+        df = pd.read_csv(csv_path, encoding="utf-8-sig")
     except Exception:
-        df = pd.read_csv(csv_path)
+        try:
+            df = pd.read_csv(csv_path, encoding="latin-1")
+        except Exception:
+            df = pd.read_csv(csv_path)
 
     if "neighborhood_id" not in df.columns:
         return {}
