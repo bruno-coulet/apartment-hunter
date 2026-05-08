@@ -120,6 +120,14 @@ def predict(data: PropertyData):
         print(f"   Types: {df_final.dtypes.to_dict()}")
         
         # 3. Transformation par le preprocessor
+        if preprocessor is None:
+            print("⚠️ Preprocessor non chargé — tentative de rechargement à la volée...")
+            load_assets()
+            if preprocessor is None:
+                err = "Preprocessor introuvable sur le serveur. Vérifier les chemins /models"
+                print(f"❌ {err}")
+                return {"error": err}
+
         X_processed = preprocessor.transform(df_final)
         
         print(f"✅ Preprocessing OK - shape: {X_processed.shape}")
