@@ -22,15 +22,21 @@ services:
       - ./data_model:/app/data_model:ro
     networks:
       - web
-    # deploy:
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.apartment-api.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.apartment-api.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment-hunter/api`)"
       - "traefik.http.routers.apartment-api.entrypoints=websecure"
       - "traefik.http.routers.apartment-api.tls.certresolver=myresolver"
+      # 2. Gestion du Slash final (Redirect)
+      - "traefik.http.middlewares.apartment-slash.redirectregex.regex=^.*\\/apartment-hunter/api$"
+      - "traefik.http.middlewares.apartment-slash.redirectregex.replacement=https://lab.zanza-creation.com/apartment-hunter/api/"
+      # 3. StripPrefix (Rabotage du chemin pour FastAPI)
+      - "traefik.http.middlewares.apartment-strip.stripprefix.prefixes=/apartment-hunter/api"
+      # 4. Application des middlewares (L'ordre compte : d'abord le slash, puis le strip)
+      - "traefik.http.routers.apartment-api.middlewares=apartment-slash,apartment-strip"
+      # 5. Port du service
       - "traefik.http.services.apartment-api.loadbalancer.server.port=8000"
-      - "traefik.http.routers.apartment-api.middlewares=api-stripprefix"
-      - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
+ 
 
   # Bloc pour le Front-end (Interface Streamlit)
   streamlit:

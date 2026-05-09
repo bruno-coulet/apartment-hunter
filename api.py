@@ -14,7 +14,7 @@ import numpy as np
 import traceback
 
 app = FastAPI(title="Apartment Hunter API",
-    root_path="/api")
+    root_path="/apartment-hunter/api")
 
 # --- CONFIGURATION DES CHEMINS ---
 MODEL_PATH = "/app/models/xgboost_model.pkl"
