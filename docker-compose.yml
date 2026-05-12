@@ -25,6 +25,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.apartment-api.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment-hunter/api`)"
+      - "traefik.http.routers.apartment-api.priority=2500" # Priorité haute
       - "traefik.http.routers.apartment-api.entrypoints=websecure"
       - "traefik.http.routers.apartment-api.tls.certresolver=myresolver"
       # 2. Gestion du Slash final (Redirect)
@@ -62,6 +63,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.apartment-ui.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment`)"
+      - "traefik.http.routers.apartment-front.priority=1500" # Entre le Hub et Sparkle
       - "traefik.http.routers.apartment-ui.entrypoints=websecure"
       - "traefik.http.routers.apartment-ui.tls.certresolver=myresolver"
       - "traefik.http.services.apartment-ui.loadbalancer.server.port=8501"
