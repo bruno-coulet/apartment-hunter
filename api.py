@@ -13,8 +13,8 @@ import pandas as pd
 import numpy as np
 import traceback
 
-app = FastAPI(title="Apartment Hunter API",
-    root_path="/apartment-hunter/api")
+app = FastAPI(title="Apartment Hunter API",root_path="/apartment-hunter/api")
+# app = FastAPI(title="Apartment Hunter API")
 
 # --- CONFIGURATION DES CHEMINS ---
 MODEL_PATH = "/app/models/xgboost_model.pkl"
