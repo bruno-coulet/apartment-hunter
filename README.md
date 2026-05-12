@@ -42,7 +42,7 @@ Le projet expose:
 ```
 apartment-hunter/
 ├── api.py
-├── streamlit_app/
+├── front_app/
 │   ├── app.py
 │   └── style.css
 ├── 1_cleaning.ipynb
@@ -191,7 +191,7 @@ Affichage:
 
 Lancer localement (hors Docker):
 ```bash
-uv run streamlit run streamlit_app/app.py
+uv run streamlit run front_app/app.py
 ```
 
 ---

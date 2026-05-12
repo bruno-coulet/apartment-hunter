@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+# Installation de uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+# Optimisation du cache Docker : synchronise que si les dépendances changent
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-cache --no-dev
+
+# Ajoute le virtualenv créé par uv au PATH pour ne plus avoir à taper "uv run"
+ENV PATH="/app/.venv/bin:$PATH"
+
+# # On utilise pyproject.toml et uv.lock
+# COPY pyproject.toml uv.lock ./
+# RUN uv sync --frozen --no-cache --no-dev
+
+# On copie le reste du projet
+COPY . .
+
+EXPOSE 8501
+
+# Commande simplifiée grâce au PATH mis à jour pour inclure le virtualenv de uv
+CMD ["streamlit", "run", "front_app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

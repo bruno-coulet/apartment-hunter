@@ -6,11 +6,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# On copie uniquement les fichiers de configuration uv (indispensable pour le cache)
+# Installation des dépendances
 COPY pyproject.toml uv.lock ./
-
-# Installation des dépendances avec uv (fini pip et requirements.txt !)
 RUN uv sync --frozen --no-cache --no-dev
+
+# Ajout du venv au PATH
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copier tout le projet (api.py, cleaning_utils.py, dossiers models et data_model)
 COPY . .
@@ -20,5 +21,6 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# Lancement sécurisé via uv
-CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Commande de lancement FastAPI
+# On écoute sur 0.0.0.0 pour être accessible par Traefik
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

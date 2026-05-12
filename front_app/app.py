@@ -9,7 +9,7 @@ L'estimation est réalisée par une API FastAPI connectée à un modèle Ridge
 entraîné sur des prix logarithmiques.
 
 Cartouche :
-  Fichier : streamlit_app/app.py
+    Fichier : front_app/app.py
   Rôle : interface utilisateur Streamlit
   Date : 2026-02-07
 """
@@ -25,8 +25,9 @@ import requests
 import streamlit as st
 
 # --- CONFIGURATION ---
-# le préfixe /api/  est désormais géré par le root_path de FastAPI
-API_URL = "http://api:8000/api/predict"
+# On cherche d'abord une variable d'environnement, sinon on utilise le DNS Docker interne
+# API_URL = os.getenv("API_URL", "http://api:8000/api/predict")
+API_URL = os.getenv("API_URL", "https://api.apartment-hunter.lab.zanza-creation.com/api/predict")
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
 NEIGHBORHOOD_MAPPING_FILE = PROJECT_ROOT / "models" / "neighborhood_mapping.json"
@@ -112,7 +113,7 @@ st.set_page_config(
 
 # --- CHARGEMENT DU CSS ---
 def load_css():
-    css_paths = ["style.css", "streamlit_app/style.css"]
+    css_paths = ["style.css", "front_app/style.css"]
     for path in css_paths:
         if os.path.exists(path):
             with open(path) as f:
