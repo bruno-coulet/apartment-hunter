@@ -31,7 +31,7 @@ services:
     container_name: apartment-front
     environment:
       # Injecte l'URL publique
-      - API_URL=https://api.apartment-hunter.lab.zanza-creation.com/api/predict
+      - API_URL=https://api.apartment-hunter.lab.zanza-creation.com/predict
     expose:
       - "8501"
     depends_on:

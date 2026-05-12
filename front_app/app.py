@@ -27,7 +27,7 @@ import streamlit as st
 # --- CONFIGURATION ---
 # On cherche d'abord une variable d'environnement, sinon on utilise le DNS Docker interne
 # API_URL = os.getenv("API_URL", "http://api:8000/api/predict")
-API_URL = os.getenv("API_URL", "https://api.apartment-hunter.lab.zanza-creation.com/predict")
+API_URL = os.getenv("API_URL", "https://api.apartment-hunter.lab.zanza-creation.com/ap/predict")
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
 NEIGHBORHOOD_MAPPING_FILE = PROJECT_ROOT / "models" / "neighborhood_mapping.json"
