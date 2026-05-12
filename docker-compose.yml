@@ -58,12 +58,12 @@ services:
     networks:
       - web
     # Note : Ajout du baseUrlPath pour le routage Traefik
-    command: uv run streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0 --server.baseUrlPath=/apartment
+    command: uv run streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0 --server.baseUrlPath=/apartment-hunter
     # deploy:
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.apartment-ui.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment`)"
-      - "traefik.http.routers.apartment-front.priority=1500" # Entre le Hub et Sparkle
+      - "traefik.http.routers.apartment-ui.rule=Host(`lab.zanza-creation.com`) && PathPrefix(`/apartment-hunter`)"
+      - "traefik.http.routers.apartment-ui.priority=1500" # Entre le Hub et Sparkle
       - "traefik.http.routers.apartment-ui.entrypoints=websecure"
       - "traefik.http.routers.apartment-ui.tls.certresolver=myresolver"
       - "traefik.http.services.apartment-ui.loadbalancer.server.port=8501"
